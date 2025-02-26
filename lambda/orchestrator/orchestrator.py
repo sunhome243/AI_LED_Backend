@@ -1,36 +1,37 @@
 import json
 import os
 import logging
-import boto3
 import math
-import google.generativeai as genai
-from google.ai.generativelanguage_v1beta.types import content
-from datetime import datetime
 import base64
 import asyncio
+from datetime import datetime
+import google.generativeai as genai
+from google.ai.generativelanguage_v1beta.types import content
+import boto3
 from boto3.dynamodb.conditions import Key
 
-# Custom Auth Error
+
 class AuthenticationError(Exception):
     """Custom exception for authentication failures"""
     pass
+
 
 # Initialize the logger
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Initialize clients outside of the handler
+region_name = os.environ.get('REGION_NAME', 'us-east-1')
 s3_client = boto3.client('s3')  # S3 client
 google_gemini_api_key = os.environ.get('GOOGLE_GEMINI_API_KEY')
 if not google_gemini_api_key:
     raise EnvironmentError(
         "GOOGLE_GEMINI_API_KEY environment variable is not set")
 client = genai.Client(api_key=google_gemini_api_key)  # Gemini client
-dynamodb = boto3.resource(
-    'dynamodb', region_name='us-east-1')  # DynamoDB client
+dynamodb = boto3.resource('dynamodb', region_name)  # DynamoDB client
 
 
-def authUser(uuid, pin):
+def auth_user(uuid, pin):
     """
     Authenticate user by comparing the provided pin with the stored pin in DynamoDB.
 
@@ -76,8 +77,6 @@ def getGenaiResponse(file):
         dict: The response from the Gemini AI model.
     """
     myfile = client.files.upload(file)
-    file_name = myfile.name
-    myfile = client.files.get(name=file_name)
 
     # Create the model configuration
     generation_config = {
@@ -313,7 +312,7 @@ def getDynamicMode(dynamicMode, deviceType):
         result["ir_code"] = ir_code
     except Exception as e:
         logger.error(f"Failed to retrieve item from DynamoDB: {str(e)}")
-        return None
+        return result
 
     return result
 
@@ -337,7 +336,8 @@ async def uploadResponseS3(response, uuid):
         s3_client.put_object(
             Body=response,
             Bucket=bucket_name,
-            Key=file_name
+            Key=file_name,
+            ContentType='application/json'
         )
     except Exception as e:
         logger.error(f"Failed to upload file to S3: {str(e)}")
@@ -401,7 +401,7 @@ async def main(event, context):
 
     # Authenticate the user
     try:
-        authUser(uuid, pin)
+        auth_user(uuid, pin)
     except AuthenticationError as e:
         return {
             'statusCode': 401,
@@ -427,6 +427,8 @@ async def main(event, context):
             'body': json.dumps("AI failed to create an appropriate response")
         }
 
+    parsed_response = json.loads(response)
+
     try:
         forArduinoTask = asyncio.create_task(
             configure_light_settings(response))
@@ -448,7 +450,7 @@ async def main(event, context):
         }
 
     try:
-        getConnectionId = asyncio.create_task(getConnectionId(uuid))
+        getConnectionIdTask = asyncio.create_task(getConnectionId(uuid))
     except Exception as e:
         logger.error(f"Failed to get connection ID: {str(e)}")
         return {
@@ -456,14 +458,14 @@ async def main(event, context):
             'body': json.dumps("Failed to get connection ID")
         }
 
-    await asyncio.gather(forArduinoTask, getConnectionId)
+    await asyncio.gather(forArduinoTask, getConnectionIdTask)
 
     # Get the results of the tasks to send data to Arduino
-    response = forArduinoTask.result()
-    connectionId = getConnectionId.result()
+    arduinoResponse = forArduinoTask.result()
+    connectionId = getConnectionIdTask.result()
 
     try:
-        send_data_to_arduino(connectionId, response)
+        send_data_to_arduino(connectionId, arduinoResponse)
     except Exception as e:
         logger.error(f"Failed to send data to Arduino: {str(e)}")
         return {
@@ -477,7 +479,7 @@ async def main(event, context):
     # Return the recommendation to the user
     return {
         'statusCode': 200,
-        'body': response["recommendation"]
+        'body': parsed_response["recommendation"]
     }
 
 
