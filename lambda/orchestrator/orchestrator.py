@@ -141,7 +141,7 @@ def getGenaiResponse(file):
     return response
 
 
-def verifyJson(response):
+def verify_and_perse_json(response):
     """
     Verify the JSON response to ensure it contains the required fields and valid values.
 
@@ -151,15 +151,11 @@ def verifyJson(response):
     Returns:
         bool: True if the JSON response is valid, False otherwise.
     """
-    if not isinstance(response, str):
-        logger.error("Failed. Response is not a string")
-        return False
-
     try:
         json_response = json.loads(response)
     except Exception as e:
-        logger.error(f"Failed. Not a valid JSON format: {str(e)}")
-        return False
+        logger.error(f"Not valid JSON: {str(e)}")
+        return None
 
     if json_response.get("context") is None:
         logger.error("Failed. No context")
@@ -395,7 +391,7 @@ async def main(event, context):
 
     # Store the audio file
     try:
-        storeWavFileTask = asyncio.create_task(store_wav_file(uuid, file))
+        wav_file = store_wav_file(uuid, file)
     except Exception as e:
         logger.error(f"Failed to write file: {str(e)}")
 
@@ -409,25 +405,20 @@ async def main(event, context):
         }
 
     # Get the response from the Gemini AI model
-    await storeWavFileTask
-    wav_file = storeWavFileTask.result
-
     retry = 0
-    verified = False
+    parsed_response = None
 
     # Retry up to 3 times to get a valid response
-    while retry < 3 and not verified:
+    while retry < 3 and parsed_response is None:
         response = getGenaiResponse(wav_file)
         retry += 1
-        verified = verifyJson(response)
+        parsed_response = verify_and_perse_json(response)
 
-    if not verified:
+    if not parsed_response:
         return {
             'statusCode': 400,
             'body': json.dumps("AI failed to create an appropriate response")
         }
-
-    parsed_response = json.loads(response)
 
     try:
         forArduinoTask = asyncio.create_task(
