@@ -44,6 +44,11 @@ resource "aws_dynamodb_table" "ircode-transition-table" {
         type = "N"
     }
 
+    attribute {
+        name = "irCode"
+        type = "S"
+    }
+
     ttl {
         attribute_name = "TimeToExist"
         enabled        = false
