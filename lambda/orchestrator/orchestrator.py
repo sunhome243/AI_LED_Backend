@@ -3,6 +3,7 @@ import os
 import logging
 import base64
 import asyncio
+import shortuuid
 from datetime import datetime
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
@@ -35,6 +36,8 @@ boto_session = Session(region_name=region_name)
 s3_client = boto_session.client('s3')
 dynamodb = boto_session.resource('dynamodb')
 
+request_id = shortuuid.uuid()
+
 # Gemini API initialization
 google_gemini_api_key = os.environ.get('GOOGLE_GEMINI_API_KEY')
 if not google_gemini_api_key:
@@ -57,7 +60,7 @@ def auth_user(uuid, pin):
     Returns:
         bool: True if authentication is successful.
     """
-    table = dynamodb.Table("auth_table")
+    table = dynamodb.Table("AuthTable")
 
     try:
         response = table.get_item(Key={'uuid': uuid})
@@ -251,7 +254,7 @@ def get_ir_code_from_table(device_type, ir_id):
     Returns:
         str: The IR code or None if not found
     """
-    table = dynamodb.Table("ircode-transition-table")
+    table = dynamodb.Table("IrCodeTable")
     try:
         response = table.get_item(
             Key={
@@ -325,7 +328,6 @@ def get_dynamic_mode(dynamic_mode, device_type):
 
     return result
 
-
 async def upload_response_s3(response, uuid):
     """
     Upload the JSON response to an S3 bucket.
@@ -346,8 +348,7 @@ async def upload_response_s3(response, uuid):
         logger.error("BUCKET_NAME environment variable not set")
         return None
 
-    current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    file_name = f"responses/{uuid}/{current_time}.json"
+    file_name = f"responses/{uuid}/{request_id}.json"
 
     try:
         s3_client.put_object(
@@ -361,6 +362,26 @@ async def upload_response_s3(response, uuid):
         logger.error(f"Failed to upload file to S3: {str(e)}")
         return None
 
+async def upload_response_dynamo(response, uuid):
+    today = datetime.date.today()
+    day_of_week = today.weekday()
+    time = datetime.datetime.now().time()
+    emotionTag = response["emotion"]["main"]
+    uuid = f'uuid#{uuid}'
+    DAY_TIME = f'DAY#{day_of_week}#TIME#{time}'
+    lightSettings = response["lightSetting"]
+    context = response["context"]
+    dynamodb.put_item(
+    TableName='ResponseTable',
+    Item={
+        'uuid': {'S': uuid},
+        'requestId': {'S': request_id},
+        'DAY#TIME': {'S': DAY_TIME},
+        'emotionTag': {'S': emotionTag},
+        'lightSetting': {'M': lightSettings},
+        'context': {'S': context}
+    }
+)
 
 async def get_connection_id(uuid):
     """
@@ -372,7 +393,7 @@ async def get_connection_id(uuid):
     Returns:
         str: The connection ID or None if not found.
     """
-    table = dynamodb.Table("websocket_finder")
+    table = dynamodb.Table("ConnectionIdTable")
 
     try:
         response = table.get_item(Key={'uuid': uuid})
@@ -554,6 +575,8 @@ async def main(event, context):
         if gemini_response and hasattr(gemini_response, 'text'):
             tasks.append(asyncio.create_task(
                 upload_response_s3(gemini_response.text, uuid)))
+            tasks.append(asyncio.create_task(
+                upload_response_dynamo(parsed_json, uuid)))
         else:
             # Add a dummy task
             tasks.append(asyncio.create_task(asyncio.sleep(0)))
@@ -600,7 +623,7 @@ async def main(event, context):
     logger.info(f"Successfully processed request for UUID: {uuid}")
     return {
         'statusCode': 200,
-        'body': parsed_json["recommendation"]
+        'body': [parsed_json["recommendation"], request_id]
     }
 
 

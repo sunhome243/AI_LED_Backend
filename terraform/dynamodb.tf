@@ -24,7 +24,7 @@ resource "aws_dynamodb_table" "user-auth-table" {
     tags = {
         Name        = "AuthTable"
         Environment = "dev"
-        Type = "Sensitive"
+        Type = "HighlySensitive"
     }
 }
 
@@ -86,5 +86,34 @@ resource "aws_dynamodb_table" "websocket-connectionid-table" {
         Name        = "ConnectionIdTable"
         Environment = "dev"
         Type = "Sensitive"
+    }
+}
+
+
+resource "aws_dynamodb_table" "response-table" {
+    name           = "ResponseTable"
+    billing_mode   = "ON_DEMAND"
+    hash_key       = "uuid" # partition key
+    range_key      = "DAY#TIME" # optimized sort key
+
+    attribute {
+        name = "uuid"
+        type = "S"
+    }
+
+    attribute {
+        name = "DAY#TIME"
+        type = "S"
+    }
+
+    ttl {
+        attribute_name = "TimeToExist"
+        enabled        = false
+    }
+
+    tags = {
+        Name        = "ResponseTable"
+        Environment = "dev"
+        Type        = "HighlySensitive"
     }
 }
