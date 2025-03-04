@@ -1,8 +1,8 @@
-import boto3
+from boto3.resources.factory import ServiceResource
 import logging
 import json
 
-dynamodb = boto3.resource('dynamodb')
+dynamodb = ServiceResource('dynamodb')
 table = dynamodb.Table('ConnectionIdTable')
 
 logger = logging.getLogger()

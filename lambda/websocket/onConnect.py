@@ -1,8 +1,10 @@
-import boto3
+from boto3.session import Session
 import logging
 import json
 
-dynamodb = boto3.resource('dynamodb')
+# Initialize only what's needed
+session = Session()
+dynamodb = session.resource('dynamodb')
 table = dynamodb.Table('ConnectionIdTable')
 
 logger = logging.getLogger()
@@ -11,9 +13,11 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        body = json.loads(event.get('body', '{}'))
-        uuid = body['uuid']
-        connection_id = body['connectionId']
+        connection_id = event['requestContext']['connectionId']
+
+        uuid = event.get('queryStringParameters', {}).get('uuid')
+        if not uuid:
+            raise ValueError("uuid is missing")
     except Exception as e:
         return {
             'statusCode': 400,

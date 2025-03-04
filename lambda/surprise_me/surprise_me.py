@@ -8,7 +8,7 @@ from datetime import datetime
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
-from gemini_config import get_gemini_config
+from gemini_config import get_gemini_config_surprise_me
 from constants import DYNAMIC_MODES, VALID_DYNAMIC_MODES, IR_CODE_MAP, DEFAULT_IR_RESULT
 
 
@@ -77,36 +77,37 @@ def auth_user(uuid, pin):
         raise AuthenticationError("Authentication failed")
 
 
-def store_wav_file(uuid, file):
-    """
-    Store a binary audio file to a temporary location.
+def get_past_reponse(uuid):
 
-    Args:
-        uuid (str): The unique identifier for the user.
-        file (bytes): The binary audio data to store.
+    current_time = datetime.datetime.now()
+    one_hour = datetime.timedelta(hours=1)
+    future_time = current_time + one_hour
+    future_time = future_time.strftime("%H:%M")
+    past_time = current_time - one_hour
+    past_time = past_time.strftime("%H:%M")
+    day = datetime.datetime.today().weekday()
 
-    Returns:
-        str: The path to the stored temporary wav file.
+    response = dynamodb.query(
+        TableName='ResponseTable',
+        KeyConditionExpression="uuid = :uuid AND begins_with (DAY#TIME, :day) AND BETWEEN :past_time AND :future_time",
+        ExpressionAttributeValues={
+            ":uuid": {"S": uuid},
+            ":day": {"S": f"DAY#{day}"},
+            ":past_time": {"S": past_time},
+            ":future_time": {"S": future_time}
+        },
+        Limit=20
+    )
 
-    Raises:
-        IOError: If file writing fails
-    """
-    wav_file = f"/tmp/{uuid}.wav"
-    try:
-        with open(wav_file, "wb") as f:
-            f.write(file)
-        return wav_file
-    except Exception as e:
-        logger.error(f"Failed to write audio file: {str(e)}")
-        raise IOError(f"Failed to write audio file: {str(e)}")
+    return response
 
 
-def get_genai_response(file):
+def get_genai_response(past_response):
     """
     Generate a response using the Gemini AI model based on the uploaded file.
 
     Args:
-        file (str): an audio file to be uploaded for processing.
+        past_response: The past response of the user.
 
     Returns:
         dict: The response from the Gemini AI model.
@@ -114,33 +115,24 @@ def get_genai_response(file):
     Raises:
         AIProcessingError: If Gemini AI processing fails
     """
-    uploaded_file = None
     try:
-        uploaded_file = client.files.upload(file)
 
-        generate_content_config = get_gemini_config()
+        generate_content_config = get_gemini_config_surprise_me()
 
         model = "gemini-2.0-flash"
         response = client.models.generate_content(
             model,
             contents=[
-                'follow the system instruction',
-                uploaded_file,
+                past_response
             ],
             config=generate_content_config,
         )
 
         return response
+
     except Exception as e:
         logger.error(f"Error in Gemini AI processing: {str(e)}")
         raise AIProcessingError(f"Gemini AI processing failed: {str(e)}")
-    finally:
-        # Clean up the uploaded file regardless of success or failure
-        if uploaded_file:
-            try:
-                client.files.delete(name=uploaded_file.name)
-            except Exception as e:
-                logger.warning(f"Failed to delete uploaded file: {str(e)}")
 
 
 def verify_and_parse_json(response):
@@ -368,7 +360,6 @@ async def upload_response_dynamo(response, uuid):
     today = datetime.date.today()
     day_of_week = today.weekday()
     time = datetime.datetime.now().time()
-    time = time.strftime("%H:%M")
     emotionTag = response["emotion"]["main"]
     uuid = f'uuid#{uuid}'
     DAY_TIME = f'DAY#{day_of_week}#TIME#{time}'
@@ -468,7 +459,7 @@ async def main(event, context):
         }
 
     # Validate required parameters
-    required_params = {'uuid', 'pin', 'file'}
+    required_params = {'uuid', 'pin'}
     if not isinstance(event, dict):
         logger.error("Event is not a dictionary")
         return {
@@ -501,27 +492,6 @@ async def main(event, context):
             'body': json.dumps("Invalid PIN format")
         }
 
-    # Decode file
-    try:
-        file = base64.b64decode(event['file'])
-    except Exception as e:
-        logger.error(f"Failed to decode base64 file: {str(e)}")
-        return {
-            'statusCode': 400,
-            'body': json.dumps("Invalid file encoding")
-        }
-
-    wav_file = None
-    # Store the audio file
-    try:
-        wav_file = store_wav_file(uuid, file)
-    except IOError as e:
-        logger.error(f"Failed to store audio file: {str(e)}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps(f"Failed to store audio file: {str(e)}")
-        }
-
     # Authenticate the user
     try:
         auth_user(uuid, pin)
@@ -529,6 +499,15 @@ async def main(event, context):
         return {
             'statusCode': 401,
             'body': json.dumps(str(e))
+        }
+
+    try:
+        # Get the past response of the user
+        past_response = get_past_reponse(uuid)
+    except:
+        return {
+            'statusCode': 404,
+            'body': json.dumps("No past response found")
         }
 
     # Get the response from the Gemini AI model
@@ -539,7 +518,7 @@ async def main(event, context):
     # Retry up to 3 times to get a valid response
     while retry < 3 and parsed_json is None:
         try:
-            gemini_response = get_genai_response(wav_file)
+            gemini_response = get_genai_response(past_response)
             parsed_json = verify_and_parse_json(gemini_response)
             if parsed_json is None:
                 logger.warning(
