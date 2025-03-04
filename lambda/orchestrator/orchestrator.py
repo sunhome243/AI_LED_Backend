@@ -328,6 +328,7 @@ def get_dynamic_mode(dynamic_mode, device_type):
 
     return result
 
+
 async def upload_response_s3(response, uuid):
     """
     Upload the JSON response to an S3 bucket.
@@ -362,6 +363,7 @@ async def upload_response_s3(response, uuid):
         logger.error(f"Failed to upload file to S3: {str(e)}")
         return None
 
+
 async def upload_response_dynamo(response, uuid):
     today = datetime.date.today()
     day_of_week = today.weekday()
@@ -372,16 +374,17 @@ async def upload_response_dynamo(response, uuid):
     lightSettings = response["lightSetting"]
     context = response["context"]
     dynamodb.put_item(
-    TableName='ResponseTable',
-    Item={
-        'uuid': {'S': uuid},
-        'requestId': {'S': request_id},
-        'DAY#TIME': {'S': DAY_TIME},
-        'emotionTag': {'S': emotionTag},
-        'lightSetting': {'M': lightSettings},
-        'context': {'S': context}
-    }
-)
+        TableName='ResponseTable',
+        Item={
+            'uuid': {'S': uuid},
+            'requestId': {'S': request_id},
+            'DAY#TIME': {'S': DAY_TIME},
+            'emotionTag': {'S': emotionTag},
+            'lightSetting': {'M': lightSettings},
+            'context': {'S': context}
+        }
+    )
+
 
 async def get_connection_id(uuid):
     """
