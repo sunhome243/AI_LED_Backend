@@ -4,7 +4,7 @@ import logging
 import base64
 import asyncio
 import shortuuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
@@ -79,17 +79,17 @@ def auth_user(uuid, pin):
 
 def get_past_reponse(uuid):
 
-    current_time = datetime.datetime.now()
-    one_hour = datetime.timedelta(hours=1)
+    current_time = datetime.now()
+    one_hour = timedelta(hours=1)
     future_time = current_time + one_hour
     future_time = future_time.strftime("%H:%M")
     past_time = current_time - one_hour
     past_time = past_time.strftime("%H:%M")
-    day = datetime.datetime.today().weekday()
+    day = datetime.today().weekday()
 
     response = dynamodb.query(
         TableName='ResponseTable',
-        KeyConditionExpression="uuid = :uuid AND begins_with (DAY#TIME, :day) AND BETWEEN :past_time AND :future_time",
+        KeyConditionExpression=Key('uuid').eq(uuid) & Key('DAY#TIME').between(past_time, future_time),
         ExpressionAttributeValues={
             ":uuid": {"S": uuid},
             ":day": {"S": f"DAY#{day}"},
@@ -365,8 +365,7 @@ async def upload_response_dynamo(response, uuid):
     DAY_TIME = f'DAY#{day_of_week}#TIME#{time}'
     lightSettings = response["lightSetting"]
     context = response["context"]
-    dynamodb.put_item(
-        TableName='ResponseTable',
+    dynamodb.Table('ResponseTable').put_item(
         Item={
             'uuid': {'S': uuid},
             'requestId': {'S': request_id},
@@ -531,13 +530,6 @@ async def main(event, context):
             # Wait a bit before retrying
             await asyncio.sleep(0.5)
 
-    # Clean up temp file
-    if wav_file and os.path.exists(wav_file):
-        try:
-            os.remove(wav_file)
-        except Exception as e:
-            logger.warning(f"Failed to delete temp file: {str(e)}")
-
     if not parsed_json:
         return {
             'statusCode': 400,
@@ -606,7 +598,7 @@ async def main(event, context):
     logger.info(f"Successfully processed request for UUID: {uuid}")
     return {
         'statusCode': 200,
-        'body': [parsed_json["recommendation"], request_id]
+        'body': json.dumps([parsed_json["recommendation"], request_id])
     }
 
 
@@ -621,4 +613,7 @@ def lambda_handler(event, context):
     Returns:
         dict: API Gateway compatible response with statusCode and body
     """
-    return asyncio.run(main(event, context))
+
+    # Create an event loop
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(main(event, context))
