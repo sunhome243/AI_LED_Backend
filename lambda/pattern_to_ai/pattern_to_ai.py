@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
-from gemini_config import get_gemini_config_surprise_me
+from get_gemini_config_surprise_me import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
 
 
@@ -133,7 +133,7 @@ def get_genai_response(past_response):
     """
     try:
         # Get Gemini configuration for surprise me feature
-        generate_content_config = get_gemini_config_surprise_me()
+        generate_content_config = get_gemini_config()
 
         # Send past responses to Gemini model
         model = "gemini-2.0-flash"
