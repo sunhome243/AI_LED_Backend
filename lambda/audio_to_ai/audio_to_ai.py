@@ -3,8 +3,9 @@ import os
 import logging
 import base64
 import shortuuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from boto3.session import Session
+from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
 from gemini_config import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
@@ -295,7 +296,6 @@ def lambda_handler(event, context):
 
         retry += 1
 
-
     # Clean up temp file
     if wav_file and os.path.exists(wav_file):
         try:
@@ -328,4 +328,3 @@ def lambda_handler(event, context):
         },
         'body': [parsed_json["recommendation"], request_id]
     }
-

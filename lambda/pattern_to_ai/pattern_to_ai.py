@@ -2,8 +2,9 @@ import json
 import os
 import logging
 import shortuuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from boto3.session import Session
+from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
 from gemini_config import get_gemini_config_surprise_me
 from constants import VALID_DYNAMIC_MODES
