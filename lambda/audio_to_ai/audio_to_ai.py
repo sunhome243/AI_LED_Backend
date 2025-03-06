@@ -3,7 +3,7 @@ import os
 import logging
 import base64
 import shortuuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
