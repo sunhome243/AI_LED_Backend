@@ -196,21 +196,41 @@ async def upload_response_s3(response, uuid, request_id):
 
 
 async def upload_response_dynamo(response, uuid, request_id):
-    today = datetime.date.today()
+    """
+    Upload the AI response data to DynamoDB for persistent storage and future analysis.
+
+    Args:
+        response (dict): The parsed JSON response containing emotion and light settings
+        uuid (str): The unique identifier of the user/device
+        request_id (str): The unique identifier for this specific request
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If DynamoDB operations fail
+    """
+    # Get current date and time information for indexing
+    today = datetime.now().date()
     day_of_week = today.weekday()
-    time = datetime.datetime.now().time()
-    emotionTag = response["emotion"]["main"]
-    uuid = f'uuid#{uuid}'
-    DAY_TIME = f'DAY#{day_of_week}#TIME#{time}'
-    lightSettings = response["lightSetting"]
+    time = datetime.now().time()
+
+    # Extract data needed for storage
+    emotion_tag = response["emotion"]["main"]
+    uuid_key = f'uuid#{uuid}'  # Format UUID as partition key
+    # Create sort key for querying by day/time
+    day_time_key = f'DAY#{day_of_week}#TIME#{time}'
+    light_settings = response["lightSetting"]
     context = response["context"]
+
+    # Store the data in DynamoDB
     dynamodb.Table('ResponseTable').put_item(
         Item={
-            'uuid': {'S': uuid},
+            'uuid': {'S': uuid_key},
             'requestId': {'S': request_id},
-            'DAY#TIME': {'S': DAY_TIME},
-            'emotionTag': {'S': emotionTag},
-            'lightSetting': {'M': lightSettings},
+            'DAY#TIME': {'S': day_time_key},
+            'emotionTag': {'S': emotion_tag},
+            'lightSetting': {'M': light_settings},
             'context': {'S': context}
         }
     )
@@ -275,27 +295,54 @@ async def send_data_to_arduino(connection_id, response):
 
 
 async def main(event, context):
-    uuid = event[uuid]
-    request_id = event[request_id]
+    """
+    Main async function that orchestrates the response processing workflow.
+
+    Performs several concurrent operations:
+    1. Configures light settings based on AI response
+    2. Retrieves the WebSocket connection ID for the target device
+    3. Uploads the response to S3 for storage
+    4. Saves the response metadata to DynamoDB
+
+    Args:
+        event (dict): Lambda event data containing UUID, request ID and AI response
+        context (object): Lambda context object
+
+    Returns:
+        None: The function performs side effects but doesn't return data
+
+    Raises:
+        TimeoutError: If the operations take too long
+        Exception: For other processing errors
+    """
+    # Extract identifiers from the event
+    uuid = event.get("uuid")
+    request_id = event.get("requestId")
+
+    if not uuid or not request_id:
+        logger.error("Missing required fields: uuid or requestId")
+        return
 
     try:
         # Set timeout for all tasks to avoid Lambda timeout
         timeout = 5  # seconds
 
-        # Create tasks
+        # Create tasks for concurrent execution
         tasks = [
             asyncio.create_task(configure_light_settings(event)),
             asyncio.create_task(get_connection_id(uuid)),
         ]
 
-        # Only upload to S3 if we have a response
-        if event and hasattr(event, 'text'):
+        # Only upload to S3 and DynamoDB if we have a complete response
+        if event:
+            event_text = json.dumps(event)
             tasks.append(asyncio.create_task(
-                upload_response_s3(event.text, uuid, request_id)))
+                upload_response_s3(event_text, uuid, request_id)))
             tasks.append(asyncio.create_task(
                 upload_response_dynamo(event, uuid, request_id)))
         else:
-            # Add a dummy task
+            # Add dummy tasks to maintain task indices
+            tasks.append(asyncio.create_task(asyncio.sleep(0)))
             tasks.append(asyncio.create_task(asyncio.sleep(0)))
 
         # Execute with timeout
@@ -324,6 +371,7 @@ async def main(event, context):
 
     except Exception as e:
         logger.error(f"Error in processing: {str(e)}")
+        # Consider adding more specific exception handling
 
     logger.info("Successfully sent data to Arduino and saved response")
 
@@ -332,16 +380,39 @@ async def main(event, context):
 
 def lambda_handler(event, context):
     """
-    Lambda handler function that calls the async main function.
+    Lambda handler function that processes incoming events from API Gateway
+    and orchestrates the response processing workflow.
+
+    This function:
+    1. Receives the AI response data
+    2. Configures light settings based on the response
+    3. Retrieves the connection ID for the target device
+    4. Saves the response to S3 and DynamoDB
+    5. Sends the configuration to the connected Arduino device
 
     Args:
-        event (dict): The event dict from Lambda trigger
+        event (dict): The event dict from Lambda trigger containing:
+                        - uuid: Unique identifier for the user/device
+                        - requestId: Unique identifier for this request
+                        - lightSetting: Light configuration parameters. Contains:
+                            - color: RGB color values
+                            - power: Power state (on/off)
+                            - dynamicMode: Dynamic mode setting
+                        - emotion: Map of detected emotions from the AI. Contains:
+                            - main: Main emotion detected
+                            - subcategories: List of subcategories
+                        - recommendation: Textual explanation of the lighting choice
+                        - context: Additional contextual information
         context (object): Lambda context object
 
     Returns:
         dict: API Gateway compatible response with statusCode and body
-    """
 
+    Environment Variables:
+        REGION_NAME: AWS region (default: 'us-east-1')
+        BUCKET_NAME: S3 bucket for storing responses
+        WEBSOCKET_URL: API Gateway WebSocket endpoint URL
+    """
     # Create an event loop
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(main(event, context))
