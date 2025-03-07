@@ -2,10 +2,8 @@ import json
 import os
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from boto3.session import Session
-from boto3.dynamodb.conditions import Key
-import google.generativeai as genai
 from constants import DYNAMIC_MODES, IR_CODE_MAP, DEFAULT_IR_RESULT
 
 
