@@ -16,3 +16,13 @@ terraform {
     encrypt = true
   }
 }
+
+module "compute" {
+  source = "./modules/compute"
+  
+  # Pass root variables to the module
+  GOOGLE_GEMINI_API_KEY = var.GOOGLE_GEMINI_API_KEY
+  REGION_NAME           = var.REGION_NAME
+  
+  # Any other variables the module requires
+}

@@ -100,7 +100,7 @@ resource "aws_iam_policy" "lambda_s3_policy" {
           "s3:GetObject"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:s3:::${var.BUCKET_NAME}/*"
+        Resource = "arn:aws:s3:::${aws_s3_bucket.response-data.bucket}/*"
       }
     ]
   })
