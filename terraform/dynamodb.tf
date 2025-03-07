@@ -108,6 +108,7 @@ resource "aws_dynamodb_table" "connection_table" {
 
     tags = {
     Name        = "WebSocket Connection Table"
-    Environment = "develop"
+    Environment = "dev"
+    Type        = "HighlySensitive"
   }
 }

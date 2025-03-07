@@ -335,7 +335,7 @@ def lambda_handler(event, context):
 
     # Invoke result-save-send Lambda to process the recommendation
     lambda_client.invoke(
-        FunctionName='result-save-send',
+        FunctionName=os.environ.get('RESULT_LAMBDA_NAME'),
         InvocationType='Event',  # for async invocation
         Payload=json.dumps(parsed_json)
     )

@@ -1,4 +1,4 @@
-# IAM role for Lambda execution
+# Common IAM role for all Lambda functions
 data "aws_iam_policy_document" "assume_role" {
   statement {
     effect = "Allow"
@@ -14,6 +14,27 @@ resource "aws_iam_role" "iam_for_lambda" {
   name               = "iam_for_lambda"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
   description        = "IAM role for Lambda functions with necessary permissions"
+}
+
+# CloudWatch Logs permissions for all Lambda functions
+resource "aws_iam_policy" "lambda_logging_policy" {
+  name        = "lambda_logging_policy"
+  description = "Allow Lambda to write logs to CloudWatch"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
 }
 
 # API Gateway Management permissions
@@ -85,44 +106,28 @@ resource "aws_iam_policy" "lambda_s3_policy" {
   })
 }
 
-# CloudWatch Logs permissions
-resource "aws_iam_policy" "lambda_logging" {
-  name        = "lambda_logging_policy"
-  description = "Allow Lambda to write logs to CloudWatch"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Effect   = "Allow"
-        Resource = "arn:aws:logs:*:*:*"
-      }
-    ]
-  })
+resource "aws_cloudwatch_log_group" "ws_messenger_logs" {
+  name              = "/aws/lambda/${aws_lambda_function.ws_messenger_lambda.function_name}"
+  retention_in_days = 30
 }
 
 # Attach all policies to Lambda role
 resource "aws_iam_role_policy_attachment" "lambda_apigateway_attachment" {
-  role       = aws_iam_role.iam_for_lambda.arn
+  role       = aws_iam_role.iam_for_lambda.name
   policy_arn = aws_iam_policy.apigateway_management_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb_attachment" {
-  role       = aws_iam_role.iam_for_lambda.arn
+  role       = aws_iam_role.iam_for_lambda.name
   policy_arn = aws_iam_policy.lambda_dynamodb_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_s3_attachment" {
-  role       = aws_iam_role.iam_for_lambda.arn
+  role       = aws_iam_role.iam_for_lambda.name
   policy_arn = aws_iam_policy.lambda_s3_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_logs_attachment" {
-  role       = aws_iam_role.iam_for_lambda.arn
-  policy_arn = aws_iam_policy.lambda_logging.arn
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_logging_policy.arn
 }

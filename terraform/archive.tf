@@ -21,3 +21,9 @@ data "archive_file" "result_save_send_lambda" {
   source_file = "${local.base_dir}/lambda/result_save_send/result_save_send.py"
   output_path = "${path.module}/result_save_send.zip"
 }
+
+data "archive_file" "ws_messenger_zip" {
+  type        = "zip"
+  source_file = "${local.base_dir}/lambda/websocket/connection_manager.py"
+  output_path = "${path.module}/ws_messenger.zip"
+}
