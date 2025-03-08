@@ -298,6 +298,15 @@ def lambda_handler(event, context):
             'body': json.dumps("Invalid file encoding")
         }
 
+    # Authenticate the user
+    try:
+        auth_user(uuid, pin)
+    except AuthenticationError as e:
+        return {
+            'statusCode': 401,
+            'body': json.dumps(str(e))
+        }
+
     wav_file = None
     # Store the audio file in temporary storage
     try:
@@ -307,15 +316,6 @@ def lambda_handler(event, context):
         return {
             'statusCode': 500,
             'body': json.dumps(f"Failed to store audio file: {str(e)}")
-        }
-
-    # Authenticate the user
-    try:
-        auth_user(uuid, pin)
-    except AuthenticationError as e:
-        return {
-            'statusCode': 401,
-            'body': json.dumps(str(e))
         }
 
     # Generate AI recommendation with retry mechanism
