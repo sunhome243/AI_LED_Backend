@@ -50,7 +50,7 @@ jobs:
 
       # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -var "GOOGLE_GEMINI_API_KEY=$GOOGLE_GEMINI_API_KEY" -var "AWS_REGION_NAME=$AWS_REGION_NAME"
 
       # Format Terraform configuration files to a canonical format and style
       - name: Terraform Format
