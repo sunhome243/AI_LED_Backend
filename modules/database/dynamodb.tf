@@ -19,11 +19,6 @@ resource "aws_dynamodb_table" "user-auth-table" {
         type = "S"
     }
 
-    ttl {
-        attribute_name = "TimeToExist"
-        enabled        = false
-    }
-
     tags = {
         Name        = "AuthTable"
         Environment = "dev"
@@ -50,11 +45,6 @@ resource "aws_dynamodb_table" "ircode-transition-table" {
         type = "N"
     }
 
-    ttl {
-        attribute_name = "TimeToExist"
-        enabled        = false
-    }
-
     tags = {
         Name        = "IrCodeTable"
         Environment = "dev"
@@ -79,11 +69,6 @@ resource "aws_dynamodb_table" "response-table" {
     attribute {
         name = "DAY#TIME"
         type = "S"
-    }
-
-    ttl {
-        attribute_name = "TimeToExist"
-        enabled        = false
     }
 
     tags = {

@@ -51,7 +51,7 @@ resource "aws_iam_policy" "apigateway_management_policy" {
           "execute-api:Invoke"
         ]
         Effect   = "Allow"
-        Resource = "${aws_apigatewayv2_api.ws_messenger_api_gateway.execution_arn}/*"
+        Resource = "*" # This will be attached later to specific API Gateway
       }
     ]
   })
@@ -76,10 +76,10 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
         ]
         Effect   = "Allow"
         Resource = [
-          aws_dynamodb_table.user-auth-table.arn,
-          aws_dynamodb_table.ircode-transition-table.arn,
-          aws_dynamodb_table.response-table.arn,
-          aws_dynamodb_table.connection_table.arn
+          var.auth_table_arn,
+          var.ircode_table_arn,
+          var.response_table_arn,
+          var.connection_table_arn
         ]
       }
     ]
@@ -100,15 +100,53 @@ resource "aws_iam_policy" "lambda_s3_policy" {
           "s3:GetObject"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:s3:::${aws_s3_bucket.response-data.bucket}/*"
+        Resource = "arn:aws:s3:::${var.response_bucket_name}/*"
       }
     ]
   })
 }
 
-resource "aws_cloudwatch_log_group" "ws_messenger_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.ws_messenger_lambda.function_name}"
-  retention_in_days = 30
+
+resource "aws_iam_role" "api_gateway_role" {
+  name = "api_gateway_cloudwatch_role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect    = "Allow",
+        Principal = {
+          Service = "apigateway.amazonaws.com",
+        },
+        Action    = "sts:AssumeRole",
+      },
+    ],
+  })
+}
+
+# Specific policy for API Gateway CloudWatch logging
+resource "aws_iam_policy" "api_gateway_logging_policy" {
+  name        = "api_gateway_logging_policy"
+  description = "Allow API Gateway to push logs to CloudWatch"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 # Attach all policies to Lambda role
@@ -130,4 +168,15 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_attachment" {
 resource "aws_iam_role_policy_attachment" "lambda_logs_attachment" {
   role       = aws_iam_role.iam_for_lambda.name
   policy_arn = aws_iam_policy.lambda_logging_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "api_gateway_logs_attachment" {
+  role       = aws_iam_role.api_gateway_role.name
+  policy_arn = aws_iam_policy.lambda_logging_policy.arn
+}
+
+# Attach API Gateway specific logging policy
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch_attachment" {
+  role       = aws_iam_role.api_gateway_role.name
+  policy_arn = aws_iam_policy.api_gateway_logging_policy.arn
 }

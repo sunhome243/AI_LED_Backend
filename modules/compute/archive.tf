@@ -1,6 +1,6 @@
 locals {
-  # Define the path to the parent directory that contains both lambda and terraform directories
-  base_dir = abspath("${path.root}/..")
+  # Define the path to the directory that contains both lambda and modules directories
+  base_dir = abspath("${path.root}")
 }
 
 # Create deployment packages for Lambda functions

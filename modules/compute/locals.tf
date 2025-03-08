@@ -1,8 +1,7 @@
 locals {
-
   lambda_common = {
     runtime  = "python3.9"
-    role_arn = aws_iam_role.iam_for_lambda.arn
+    role_arn = var.lambda_role_arn
   }
 
   # Define function names to be used consistently
@@ -38,16 +37,16 @@ locals {
       handler     = "result_save_send.lambda_handler"
       environment = {
         GOOGLE_GEMINI_API_KEY = var.GOOGLE_GEMINI_API_KEY
-        BUCKET_NAME           = aws_s3_bucket.response-data.bucket
+        BUCKET_NAME           = var.response_bucket_name
         REGION_NAME           = var.REGION_NAME
-        WEBSOCKET_URL         = "${aws_apigatewayv2_api.ws_messenger_api_gateway.api_endpoint}/${aws_apigatewayv2_stage.ws_messenger_api_stage.name}"
+        WEBSOCKET_URL         = "${var.websocket_endpoint}/${var.websocket_stage_name}"
       }
     },
     ws_messenger = {
       source_path = "${local.base_dir}/lambda/websocket/connection_manager.py"
       handler     = "connection_manager.lambda_handler"
       environment = {
-        CONNECTION_TABLE = aws_dynamodb_table.connection_table.name
+        CONNECTION_TABLE = var.connection_table_name
       }
     }
   }

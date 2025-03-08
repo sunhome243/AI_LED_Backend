@@ -9,4 +9,27 @@ variable "REGION_NAME" {
   description = "AWS region where resources are deployed"
 }
 
-# Other module-specific variables
+variable "lambda_role_arn" {
+  type        = string
+  description = "ARN of the IAM role for Lambda functions"
+}
+
+variable "response_bucket_name" {
+  type        = string
+  description = "Name of the S3 bucket for response data"
+}
+
+variable "websocket_endpoint" {
+  type        = string
+  description = "API endpoint for WebSocket API Gateway"
+}
+
+variable "websocket_stage_name" {
+  type        = string
+  description = "Stage name for WebSocket API Gateway"
+}
+
+variable "connection_table_name" {
+  type        = string
+  description = "Name of the WebSocket Connection DynamoDB table"
+}

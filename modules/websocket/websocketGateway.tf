@@ -71,6 +71,7 @@ resource "aws_apigatewayv2_route" "ws_messenger_api_connect_route" {
   api_id    = aws_apigatewayv2_api.ws_messenger_api_gateway.id
   route_key = "$connect"
   target    = "integrations/${aws_apigatewayv2_integration.ws_messenger_api_integration.id}"
+  depends_on = [aws_apigatewayv2_route.ws_messenger_api_default_route]
 }
 
 resource "aws_apigatewayv2_route_response" "ws_messenger_api_connect_route_response" {
@@ -83,6 +84,7 @@ resource "aws_apigatewayv2_route" "ws_messenger_api_disconnect_route" {
   api_id    = aws_apigatewayv2_api.ws_messenger_api_gateway.id
   route_key = "$disconnect"
   target    = "integrations/${aws_apigatewayv2_integration.ws_messenger_api_integration.id}"
+  depends_on = [aws_apigatewayv2_route.ws_messenger_api_connect_route]
 }
 
 resource "aws_apigatewayv2_route_response" "ws_messenger_api_disconnect_route_response" {
@@ -95,6 +97,7 @@ resource "aws_apigatewayv2_route" "ws_messenger_api_message_route" {
   api_id    = aws_apigatewayv2_api.ws_messenger_api_gateway.id
   route_key = "MESSAGE"
   target    = "integrations/${aws_apigatewayv2_integration.ws_messenger_api_integration.id}"
+  depends_on = [aws_apigatewayv2_route.ws_messenger_api_disconnect_route]
 }
 
 resource "aws_apigatewayv2_route_response" "ws_messenger_api_message_route_response" {
@@ -110,9 +113,16 @@ resource "aws_apigatewayv2_stage" "ws_messenger_api_stage" {
 }
 
 resource "aws_lambda_permission" "ws_messenger_lambda_permissions" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+  statement_id  = "AllowExecutionFromAPIGatewayWebsocket"  # Changed to make it unique
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.ws_messenger_lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.ws_messenger_api_gateway.execution_arn}/*/*"
+  depends_on    = [
+    aws_apigatewayv2_stage.ws_messenger_api_stage,
+    aws_apigatewayv2_route.ws_messenger_api_default_route,
+    aws_apigatewayv2_route.ws_messenger_api_connect_route,
+    aws_apigatewayv2_route.ws_messenger_api_disconnect_route,
+    aws_apigatewayv2_route.ws_messenger_api_message_route
+  ]
 }
