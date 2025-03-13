@@ -46,6 +46,7 @@ module "websocket" {
   depends_on            = [module.iam, module.database]
   lambda_role_arn       = module.iam.lambda_role_arn
   connection_table_name = module.database.connection_table_name
+  api_gateway_role_arn  = module.iam.api_gateway_role_arn
 }
 
 module "compute" {

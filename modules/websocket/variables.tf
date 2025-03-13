@@ -1,9 +1,14 @@
 variable "lambda_role_arn" {
-  type        = string
   description = "ARN of the IAM role for Lambda functions"
+  type        = string
 }
 
 variable "connection_table_name" {
+  description = "Name of the DynamoDB table for WebSocket connections"
   type        = string
-  description = "Name of the WebSocket Connection DynamoDB table"
+}
+
+variable "api_gateway_role_arn" {
+  description = "ARN of the IAM role for API Gateway"
+  type        = string
 }
