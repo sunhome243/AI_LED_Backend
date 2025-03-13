@@ -23,22 +23,18 @@ locals {
     "${local.base_dir}/lambda/websocket/${file}"
   ]
   
-  # Calculate hash of source files to detect changes
-  audio_to_ai_hash = sha256(join("", [
-    for file in local.audio_to_ai_files : filebase64(file)
-  ]))
-  
-  pattern_to_ai_hash = sha256(join("", [
-    for file in local.pattern_to_ai_files : filebase64(file)
-  ]))
-  
-  result_save_send_hash = sha256(join("", [
-    for file in local.result_save_send_files : filebase64(file)
-  ]))
-  
-  ws_messenger_hash = sha256(join("", [
-    for file in local.ws_messenger_files : filebase64(file)
-  ]))
+  # Calculate hash of source files to detect changes - using filemd5 for more reliable hashes
+  audio_to_ai_hash = filemd5(data.archive_file.audio_to_ai_lambda.output_path)
+  pattern_to_ai_hash = filemd5(data.archive_file.pattern_to_ai_lambda.output_path)
+  result_save_send_hash = filemd5(data.archive_file.result_save_send_lambda.output_path)
+  ws_messenger_hash = filemd5(data.archive_file.ws_messenger_zip.output_path)
+}
+
+# Ensure archive directory exists
+resource "local_file" "ensure_archive_dir" {
+  content     = ""
+  filename    = "${path.module}/archive/.keep"
+  file_permission = "0644"
 }
 
 # Create deployment packages for Lambda functions
@@ -46,31 +42,26 @@ data "archive_file" "audio_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/audio_to_ai"
   output_path = "${path.module}/archive/audio_to_ai.zip"
-  
-  # This forces the archive to be regenerated when files change
-  output_file_mode = "0644"
+  depends_on  = [local_file.ensure_archive_dir]
 }
 
 data "archive_file" "pattern_to_ai_lambda" {
   type        = "zip"
-  source_dir = "${local.base_dir}/lambda/pattern_to_ai"
+  source_dir  = "${local.base_dir}/lambda/pattern_to_ai"
   output_path = "${path.module}/archive/pattern_to_ai.zip"
-  
-  output_file_mode = "0644"
+  depends_on  = [local_file.ensure_archive_dir]
 }
 
 data "archive_file" "result_save_send_lambda" {
   type        = "zip"
-  source_dir = "${local.base_dir}/lambda/result_save_send"
+  source_dir  = "${local.base_dir}/lambda/result_save_send"
   output_path = "${path.module}/archive/result_save_send.zip"
-  
-  output_file_mode = "0644"
+  depends_on  = [local_file.ensure_archive_dir]
 }
 
 data "archive_file" "ws_messenger_zip" {
   type        = "zip"
-  source_dir = "${local.base_dir}/lambda/websocket"
+  source_dir  = "${local.base_dir}/lambda/websocket"
   output_path = "${path.module}/archive/ws_messenger.zip"
-  
-  output_file_mode = "0644"
+  depends_on  = [local_file.ensure_archive_dir]
 }
