@@ -5,7 +5,7 @@ resource "aws_apigatewayv2_api" "ws_messenger_api_gateway" {
 }
 
 resource "aws_apigatewayv2_integration" "ws_messenger_api_integration" {
-  api_id                    = aws_apigatewayv2_api.websocket_api.id
+  api_id                    = aws_apigatewayv2_api.ws_messenger_api_gateway.id
   integration_type          = "AWS_PROXY"
   integration_uri           = aws_lambda_function.ws_messenger_lambda.invoke_arn
   credentials_arn           = var.api_gateway_role_arn
