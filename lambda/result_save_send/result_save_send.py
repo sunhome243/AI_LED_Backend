@@ -227,17 +227,24 @@ async def upload_response_dynamo(response, uuid, request_id):
     light_settings = response["lightSetting"]
     context = response["context"]
 
-    # Store the data in DynamoDB
-    dynamodb.Table('ResponseTable').put_item(
-        Item={
-            'uuid': {'S': uuid_key},
-            'requestId': {'S': request_id},
-            'DAY#TIME': {'S': day_time_key},
-            'emotionTag': {'S': emotion_tag},
-            'lightSetting': {'M': light_settings},
-            'context': {'S': context}
-        }
-    )
+    try:
+        # Store the data in DynamoDB - fix the item format
+        # When using boto3 resource interface (Table), we don't need type annotations
+        dynamodb.Table('ResponseTable').put_item(
+            Item={
+                'uuid': uuid_key,
+                'requestId': request_id,
+                'DAY#TIME': day_time_key,
+                'emotionTag': emotion_tag,
+                'lightSetting': light_settings,
+                'context': context
+            }
+        )
+        logger.info(
+            f"Successfully stored response in DynamoDB for UUID: {uuid}")
+    except Exception as e:
+        logger.error(f"Failed to store response in DynamoDB: {str(e)}")
+        raise
 
 
 async def get_connection_id(uuid):
@@ -350,10 +357,15 @@ async def main(event, context):
         # Only upload to S3 and DynamoDB if we have a complete response
         if event:
             event_text = json.dumps(event)
-            tasks.append(asyncio.create_task(
-                upload_response_s3(event_text, uuid, request_id)))
-            tasks.append(asyncio.create_task(
-                upload_response_dynamo(event, uuid, request_id)))
+            try:
+                upload_s3_task = asyncio.create_task(
+                    upload_response_s3(event_text, uuid, request_id))
+                upload_dynamo_task = asyncio.create_task(
+                    upload_response_dynamo(event, uuid, request_id))
+                tasks.append(upload_s3_task)
+                tasks.append(upload_dynamo_task)
+            except Exception as e:
+                logger.error(f"Error setting up storage tasks: {str(e)}")
         else:
             # Add dummy tasks to maintain task indices
             tasks.append(asyncio.create_task(asyncio.sleep(0)))
