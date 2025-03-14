@@ -8,9 +8,8 @@ locals {
     "${local.base_dir}/lambda/websocket/${file}"
   ]
   
-  ws_messenger_hash = sha256(join("", [
-    for file in local.ws_messenger_files : filebase64(file)
-  ]))
+  # More reliable source hash calculation
+  ws_messenger_source_hash = sha256(join("", [for f in local.ws_messenger_files : filesha256(f)]))
 }
 
 resource "aws_lambda_function" "ws_messenger_lambda" {
@@ -19,7 +18,9 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
   role             = var.lambda_role_arn
   handler          = "connection_manager.lambda_handler"
   runtime          = "python3.9"
-  source_code_hash = local.ws_messenger_hash
+  source_code_hash = data.archive_file.ws_messenger_zip.output_base64sha256
+  memory_size      = 128
+  timeout          = 10
   
   environment {
     variables = {
@@ -30,11 +31,11 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
 
 # Resource removed to avoid duplication with the one in websocketGateway.tf
 
-# Archive resource for Lambda code
+# Archive resource for Lambda code with unique filename based on hash
 data "archive_file" "ws_messenger_zip" {
   type        = "zip"
   source_file = "${local.base_dir}/lambda/websocket/connection_manager.py"
-  output_path = "${path.module}/archive/ws_messenger.zip"
+  output_path = "${path.module}/archive/ws_messenger_${local.ws_messenger_source_hash}.zip"
   output_file_mode = "0644"
 }
 
