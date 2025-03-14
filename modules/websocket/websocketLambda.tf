@@ -28,23 +28,7 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
   }
 }
 
-resource "aws_lambda_permission" "ws_messenger_lambda_permissions" {
-  statement_id  = "AllowExecutionFromAPIGatewayWebsocket"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ws_messenger_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  
-  # Explicitly specify the source ARN with wildcards for all routes and methods
-  source_arn    = "${aws_apigatewayv2_api.ws_messenger_api_gateway.execution_arn}/*/*"
-  
-  depends_on    = [
-    aws_apigatewayv2_stage.ws_messenger_api_stage,
-    aws_apigatewayv2_route.ws_messenger_api_default_route,
-    aws_apigatewayv2_route.ws_messenger_api_connect_route,
-    aws_apigatewayv2_route.ws_messenger_api_disconnect_route,
-    aws_apigatewayv2_route.ws_messenger_api_message_route
-  ]
-}
+# Resource removed to avoid duplication with the one in websocketGateway.tf
 
 # Archive resource for Lambda code
 data "archive_file" "ws_messenger_zip" {
