@@ -75,6 +75,26 @@ resource "aws_apigatewayv2_stage" "ws_messenger_api_stage" {
   api_id      = aws_apigatewayv2_api.ws_messenger_api_gateway.id
   name        = "develop"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 100
+    throttling_rate_limit  = 50
+  }
+}
+
+resource "aws_api_gateway_usage_plan" "websocket_usage_plan" {
+  name        = "websocket-usage-plan"
+  description = "Usage plan for WebSocket API"
+  
+  api_stages {
+    api_id = aws_apigatewayv2_api.ws_messenger_api_gateway.id
+    stage  = aws_apigatewayv2_stage.ws_messenger_api_stage.name
+  }
+  
+  throttle_settings {
+    burst_limit = 100
+    rate_limit  = 50
+  }
 }
 
 resource "aws_lambda_permission" "ws_messenger_lambda_permissions" {
