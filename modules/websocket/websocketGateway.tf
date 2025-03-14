@@ -11,6 +11,7 @@ resource "aws_apigatewayv2_integration" "ws_messenger_api_integration" {
   credentials_arn           = var.api_gateway_role_arn
   content_handling_strategy = "CONVERT_TO_TEXT"
   passthrough_behavior      = "WHEN_NO_MATCH"
+  integration_method        = "POST"
 }
 
 resource "aws_apigatewayv2_integration_response" "ws_messenger_api_integration_response" {

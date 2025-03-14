@@ -106,6 +106,24 @@ resource "aws_iam_policy" "lambda_s3_policy" {
   })
 }
 
+# Lambda invocation policy for API Gateway
+resource "aws_iam_policy" "lambda_invoke_policy" {
+  name        = "lambda_invoke_policy"
+  description = "Allow API Gateway to invoke Lambda functions"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Effect   = "Allow"
+        Resource = "*"  # You can restrict this to specific Lambda ARNs for better security
+      }
+    ]
+  })
+}
 
 resource "aws_iam_role" "api_gateway_role" {
   name = "api_gateway_cloudwatch_role"
@@ -179,4 +197,10 @@ resource "aws_iam_role_policy_attachment" "api_gateway_logs_attachment" {
 resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch_attachment" {
   role       = aws_iam_role.api_gateway_role.name
   policy_arn = aws_iam_policy.api_gateway_logging_policy.arn
+}
+
+# Attach Lambda invoke permissions to API Gateway role
+resource "aws_iam_role_policy_attachment" "api_gateway_lambda_invoke_attachment" {
+  role       = aws_iam_role.api_gateway_role.name
+  policy_arn = aws_iam_policy.lambda_invoke_policy.arn
 }
