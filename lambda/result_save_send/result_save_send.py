@@ -135,6 +135,12 @@ def get_dynamic_mode(dynamic_mode, device_type):
     result = DEFAULT_IR_RESULT.copy()
 
     try:
+        # Check if dynamic_mode is None or empty
+        if not dynamic_mode:
+            logger.warning(
+                f"No dynamic mode specified, using default settings")
+            return result
+
         dynamic_mode_id = DYNAMIC_MODES.get(dynamic_mode)
         if dynamic_mode_id is None:
             logger.error(f"Unknown dynamic mode: {dynamic_mode}")
@@ -280,8 +286,18 @@ async def send_data_to_arduino(connection_id, response):
         raise ValueError("Connection ID cannot be empty")
 
     try:
+        # Fix WebSocket URL format for the API Gateway client
+        # Remove wss:// prefix if present
+        if websocket_url.startswith('wss://'):
+            endpoint_url = 'https://' + websocket_url[6:]
+        elif not websocket_url.startswith('https://'):
+            endpoint_url = 'https://' + websocket_url
+        else:
+            endpoint_url = websocket_url
+
+        logger.info(f"Using endpoint URL: {endpoint_url}")
         apigateway_client = boto_session.client(
-            'apigatewaymanagementapi', endpoint_url=websocket_url)
+            'apigatewaymanagementapi', endpoint_url=endpoint_url)
         api_response = apigateway_client.post_to_connection(
             ConnectionId=connection_id,
             Data=response.encode('utf-8')
@@ -360,7 +376,12 @@ async def main(event, context):
 
         # Validate connection_id and send data
         if connection_id:
-            await send_data_to_arduino(connection_id, arduino_response)
+            try:
+                await send_data_to_arduino(connection_id, arduino_response)
+                logger.info(
+                    "Successfully sent data to Arduino and saved response")
+            except Exception as e:
+                logger.error(f"Failed to send data to Arduino: {str(e)}")
         else:
             logger.error("No connection ID found for the device")
 
@@ -370,8 +391,6 @@ async def main(event, context):
     except Exception as e:
         logger.error(f"Error in processing: {str(e)}")
         # Consider adding more specific exception handling
-
-    logger.info("Successfully sent data to Arduino and saved response")
 
     return None
 

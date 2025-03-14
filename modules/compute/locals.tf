@@ -39,7 +39,12 @@ locals {
         GOOGLE_GEMINI_API_KEY = var.GOOGLE_GEMINI_API_KEY
         BUCKET_NAME           = var.response_bucket_name
         REGION_NAME           = var.REGION_NAME
-        WEBSOCKET_URL         = "${var.websocket_endpoint}/${var.websocket_stage_name}"
+        # Format WebSocket URL correctly without wss:// prefix
+        WEBSOCKET_URL         = replace(
+          "${var.websocket_endpoint}/${var.websocket_stage_name}",
+          "wss://", 
+          ""
+        )
       }
     },
     ws_messenger = {

@@ -37,6 +37,8 @@ resource "aws_lambda_function" "result_save_send" {
   handler          = local.lambda_functions.result_save_send.handler
   runtime          = local.lambda_common.runtime
   source_code_hash = local.result_save_send_hash
+  memory_size      = 256  # Increase memory for better performance
+  timeout          = 30   # Increase timeout to handle async operations
 
   environment {
     variables = local.lambda_functions.result_save_send.environment
