@@ -238,7 +238,7 @@ async def upload_response_dynamo(response, uuid, request_id):
             Item={
                 'uuid': uuid_key,
                 'requestId': request_id,
-                'DAY#TIME': day_time_key,
+                'TIME#DAY': day_time_key,
                 'emotionTag': emotion_tag,
                 'lightSetting': light_settings,
                 'context': context

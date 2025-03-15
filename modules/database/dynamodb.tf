@@ -56,7 +56,7 @@ resource "aws_dynamodb_table" "response-table" {
     name           = "ResponseTable"
     billing_mode   = "PROVISIONED"
     hash_key       = "uuid" # partition key
-    range_key      = "DAY#TIME" # optimized sort key
+    range_key      = "TIME#DAY" # optimized sort key
 
     read_capacity  = 5
     write_capacity = 5
@@ -67,7 +67,7 @@ resource "aws_dynamodb_table" "response-table" {
     }
 
     attribute {
-        name = "DAY#TIME"
+        name = "TIME#DAY"
         type = "S"
     }
 

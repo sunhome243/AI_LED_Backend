@@ -85,8 +85,7 @@ def get_past_reponse(uuid):
         uuid (str): The unique identifier for the user.
 
     Returns:
-        dict: DynamoDB response containing past user responses within the timeframe.
-              Typically contains response context, emotion data, and light settings.
+        list: List of parsed user response items within the timeframe.
 
     Raises:
         Exception: If the DynamoDB query fails.
@@ -100,21 +99,27 @@ def get_past_reponse(uuid):
     past_time = past_time.strftime("%H:%M")
     day = datetime.today().weekday()
 
-    # Query DynamoDB for responses within the time window
-    response = dynamodb.query(
-        TableName='ResponseTable',
-        KeyConditionExpression=Key('uuid').eq(uuid) & Key(
-            'DAY#TIME').between(past_time, future_time),
-        ExpressionAttributeValues={
-            ":uuid": {"S": uuid},
-            ":day": {"S": f"DAY#{day}"},
-            ":past_time": {"S": past_time},
-            ":future_time": {"S": future_time}
-        },
-        Limit=20  # Limit to 20 most recent responses
-    )
+    # Get the DynamoDB table reference
+    table = dynamodb.Table('ResponseTable')
 
-    return response
+    # Create the composite sort key values with day and time
+    day_time_prefix = f"DAY#{day}#"
+    start_key = f"{day_time_prefix}{past_time}"
+    end_key = f"{day_time_prefix}{future_time}"
+
+    try:
+        # Query DynamoDB for responses within the time window using resource API
+        response = table.query(
+            KeyConditionExpression=Key('uuid').eq(uuid) &
+            Key('DAY#TIME').between(start_key, end_key),
+            Limit=20  # Limit to 20 most recent responses
+        )
+
+        # Return the items from the response
+        return response.get('Items', [])
+    except Exception as e:
+        logger.error(f"Error querying DynamoDB: {str(e)}")
+        raise
 
 
 def get_genai_response(past_response):
@@ -236,7 +241,7 @@ def lambda_handler(event, context):
         GOOGLE_GEMINI_API_KEY: API key for Google's Gemini AI service
     """
     # Validate required environment variables
-    required_vars = ['REGION_NAME','GOOGLE_GEMINI_API_KEY']
+    required_vars = ['REGION_NAME', 'GOOGLE_GEMINI_API_KEY']
     missing_vars = [var for var in required_vars if not os.environ.get(var)]
     if missing_vars:
         logger.error(
