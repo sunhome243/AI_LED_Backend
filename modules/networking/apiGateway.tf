@@ -135,3 +135,32 @@ resource "aws_cloudwatch_log_group" "api_gateway_log_group" {
   retention_in_days = 7
 }
 
+# Permission for API Gateway to invoke the isConnect Lambda function
+resource "aws_lambda_permission" "isConnect_api_permission" {
+  statement_id  = "AllowAPIGatewayToInvokeIsConnect"
+  action        = "lambda:InvokeFunction"
+  function_name = "is-connect"  # Using the function name directly
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_deployment.deploy.execution_arn}/*/*"
+  depends_on    = [aws_api_gateway_integration.is_connect_api_int]
+}
+
+# Add these Lambda permissions for all Lambda functions to ensure they can be invoked by API Gateway
+resource "aws_lambda_permission" "pattern_to_ai_api_permission" {
+  statement_id  = "AllowAPIGatewayToInvokePatternToAi"
+  action        = "lambda:InvokeFunction"
+  function_name = "pattern-to-ai"  # Using the function name directly
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_deployment.deploy.execution_arn}/*/*"
+  depends_on    = [aws_api_gateway_integration.pattern_to_ai_api_int]
+}
+
+resource "aws_lambda_permission" "audio_to_ai_api_permission" {
+  statement_id  = "AllowAPIGatewayToInvokeAudioToAi"
+  action        = "lambda:InvokeFunction"
+  function_name = "audio-to-ai"  # Using the function name directly
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_deployment.deploy.execution_arn}/*/*"
+  depends_on    = [aws_api_gateway_integration.audio_to_ai_api_int]
+}
+
