@@ -76,6 +76,10 @@ resource "aws_dynamodb_table" "response-table" {
         Environment = "dev"
         Type        = "HighlySensitive"
     }
+
+    lifecycle {
+        create_before_destroy = true
+    }
 }
 
 resource "aws_dynamodb_table" "connection_table" {
