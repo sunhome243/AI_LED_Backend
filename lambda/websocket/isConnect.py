@@ -1,11 +1,10 @@
-from boto3.resources.factory import ServiceResource
-from boto3.session import Session
+import boto3.session
 import logging
 import json
 
-# Initialize just the DynamoDB resource instead of all boto3
-session = Session()
-dynamodb = ServiceResource('dynamodb')
+# Initialize just the DynamoDB resource with minimal imports
+session = boto3.session.Session()
+dynamodb = session.resource('dynamodb')
 table = dynamodb.Table('ConnectionIdTable')
 
 logger = logging.getLogger()
