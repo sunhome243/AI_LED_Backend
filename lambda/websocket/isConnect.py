@@ -14,8 +14,9 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        body = json.loads(event.get('body', '{}'))
-        uuid = body['uuid']
+        uuid = event.get('uuid')
+        if not uuid:
+            raise ValueError("UUID is required")
     except Exception as e:
         return {
             'statusCode': 400,
