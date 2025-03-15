@@ -29,6 +29,12 @@ resource "aws_api_gateway_resource" "audio_to_ai_gateway_resource" {
   path_part   = "create"
 }
 
+resource "aws_api_gateway_resource" "is_connect" {
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  parent_id   = aws_api_gateway_rest_api.rest_api.root_resource_id
+  path_part   = "is_connect"
+}
+
 resource "aws_api_gateway_method" "pattern_to_ai_http_method" {
   authorization = "NONE"
   http_method   = "POST"
@@ -40,6 +46,13 @@ resource "aws_api_gateway_method" "audio_to_ai_http_method" {
   authorization = "NONE"
   http_method   = "POST"
   resource_id   = aws_api_gateway_resource.audio_to_ai_gateway_resource.id
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+}
+
+resource "aws_api_gateway_method" "is_connect_http_method" {
+  authorization = "NONE"
+  http_method   = "POST"
+  resource_id   = aws_api_gateway_resource.is_connect.id
   rest_api_id   = aws_api_gateway_rest_api.rest_api.id
 }
 
@@ -61,8 +74,21 @@ resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
   uri         = var.audio_to_ai_lambda_arn
 }
 
+resource "aws_api_gateway_integration" "is_connect_api_int" {
+  http_method = aws_api_gateway_method.is_connect_http_method.http_method
+  resource_id = aws_api_gateway_resource.is_connect.id
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  integration_http_method = "POST"
+  type        = "AWS_PROXY"
+  uri         = var.isConnect_lambda_arn
+}
+
 resource "aws_api_gateway_deployment" "deploy" {
-    depends_on = [aws_api_gateway_integration.pattern_to_ai_api_int, aws_api_gateway_integration.audio_to_ai_api_int]
+    depends_on = [
+      aws_api_gateway_integration.pattern_to_ai_api_int,
+      aws_api_gateway_integration.audio_to_ai_api_int,
+      aws_api_gateway_integration.is_connect_api_int
+    ]
     rest_api_id = aws_api_gateway_rest_api.rest_api.id
     triggers = {
     redeployment = sha1(jsonencode([
@@ -72,6 +98,8 @@ resource "aws_api_gateway_deployment" "deploy" {
         aws_api_gateway_integration.pattern_to_ai_api_int.id,
         aws_api_gateway_method.audio_to_ai_http_method.id,
         aws_api_gateway_integration.audio_to_ai_api_int.id,
+        aws_api_gateway_method.is_connect_http_method.id,
+        aws_api_gateway_integration.is_connect_api_int.id,
     ]))
   }
   lifecycle {

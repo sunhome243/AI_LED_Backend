@@ -10,6 +10,7 @@ locals {
     pattern_to_ai   = "pattern-to-ai"
     result_save_send = "result-save-send"
     ws_messenger    = "ws-messenger"
+    isConnect       = "is-connect"  # Added isConnect function
   }
 
   # Lambda function configurations
@@ -50,6 +51,13 @@ locals {
     ws_messenger = {
       source_path = "${local.base_dir}/lambda/websocket/connection_manager.py"
       handler     = "connection_manager.lambda_handler"
+      environment = {
+        CONNECTION_TABLE = var.connection_table_name
+      }
+    },
+    isConnect = {
+      source_path = "${local.base_dir}/lambda/websocket/isConnect.py"
+      handler     = "isConnect.lambda_handler" 
       environment = {
         CONNECTION_TABLE = var.connection_table_name
       }

@@ -1,4 +1,3 @@
-
 variable "aws_region" {
   default = "us-east-1"
 }
@@ -28,4 +27,9 @@ variable "audio_to_ai_lambda_arn" {
 variable "gateway_role_arn" {
   type        = string
   description = "gateway logging role arn"
+}
+
+variable "isConnect_lambda_arn" {
+  type        = string
+  description = "isConnect lambda arn"
 }

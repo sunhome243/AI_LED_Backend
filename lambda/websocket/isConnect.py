@@ -26,17 +26,31 @@ def lambda_handler(event, context):
         }
 
     try:
-        table.get_item(Item={'uuid': uuid})
+        # Correct way to query an item from DynamoDB
+        response = table.get_item(Key={'uuid': uuid})
+
+        # Check if the item exists and has a connectionId
+        if 'Item' in response and 'connectionId' in response['Item']:
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'connected': True,
+                    'message': 'Arduino is connected'
+                })
+            }
+        else:
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'connected': False,
+                    'message': 'Arduino is not connected'
+                })
+            }
     except Exception as e:
         return {
             'statusCode': 500,
             'body': json.dumps({
-                'error': 'failed to get in dynamodb. not connected',
+                'error': 'failed to check connection status',
                 'message': str(e)
             })
         }
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps({'message': 'Arduino is connected'})
-    }

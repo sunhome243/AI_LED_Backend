@@ -33,3 +33,9 @@ variable "connection_table_name" {
   type        = string
   description = "Name of the WebSocket Connection DynamoDB table"
 }
+
+variable "rest_api_execution_arn" {
+  type        = string
+  description = "Execution ARN of the REST API Gateway"
+  default     = ""
+}
