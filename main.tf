@@ -70,5 +70,11 @@ module "networking" {
   pattern_to_ai_lambda_arn = module.compute.pattern_to_ai_lambda_arn
   audio_to_ai_lambda_arn   = module.compute.audio_to_ai_lambda_arn
   isConnect_lambda_arn     = module.compute.isConnect_lambda_arn
+  
+  # Add these new variables
+  pattern_to_ai_function_name = module.compute.pattern_to_ai_function_name
+  audio_to_ai_function_name   = module.compute.audio_to_ai_function_name
+  isConnect_function_name     = module.compute.isConnect_function_name
+  
   gateway_role_arn         = module.iam.api_gateway_role_arn
 }

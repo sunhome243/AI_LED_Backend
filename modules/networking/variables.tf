@@ -33,3 +33,22 @@ variable "isConnect_lambda_arn" {
   type        = string
   description = "ARN of isConnect lambda function"
 }
+
+# Add these variables for function names
+variable "pattern_to_ai_function_name" {
+  type        = string
+  description = "Function name of pattern_to_ai lambda"
+  default     = ""
+}
+
+variable "audio_to_ai_function_name" {
+  type        = string
+  description = "Function name of audio_to_ai lambda"
+  default     = ""
+}
+
+variable "isConnect_function_name" {
+  type        = string
+  description = "Function name of isConnect lambda"
+  default     = ""
+}
