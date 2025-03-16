@@ -62,7 +62,7 @@ resource "aws_api_gateway_integration" "pattern_to_ai_api_int" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type        = "AWS_PROXY"
-  uri         = var.pattern_to_ai_lambda_arn
+  uri         = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.pattern_to_ai_lambda_arn}/invocations"
 }
 
 resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
@@ -71,7 +71,7 @@ resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type        = "AWS_PROXY"
-  uri         = var.audio_to_ai_lambda_arn
+  uri         = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.audio_to_ai_lambda_arn}/invocations"
 }
 
 resource "aws_api_gateway_integration" "is_connect_api_int" {
@@ -80,7 +80,7 @@ resource "aws_api_gateway_integration" "is_connect_api_int" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type        = "AWS_PROXY"
-  uri         = var.isConnect_lambda_arn
+  uri         = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.isConnect_lambda_arn}/invocations"
 }
 
 resource "aws_api_gateway_deployment" "deploy" {
