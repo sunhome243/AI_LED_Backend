@@ -139,7 +139,7 @@ resource "aws_cloudwatch_log_group" "api_gateway_log_group" {
 resource "aws_lambda_permission" "isConnect_api_permission" {
   statement_id  = "AllowAPIGatewayToInvokeIsConnect"
   action        = "lambda:InvokeFunction"
-  function_name = var.isConnect_lambda_arn  # Use the full ARN
+  function_name = split(":", var.isConnect_lambda_arn)[6]  # Extract function name from ARN
   principal     = "apigateway.amazonaws.com"
   # More specific source ARN for this endpoint
   source_arn    = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.is_connect_http_method.http_method}${aws_api_gateway_resource.is_connect.path}"
@@ -150,7 +150,7 @@ resource "aws_lambda_permission" "isConnect_api_permission" {
 resource "aws_lambda_permission" "pattern_to_ai_api_permission" {
   statement_id  = "AllowAPIGatewayToInvokePatternToAi"
   action        = "lambda:InvokeFunction"
-  function_name = var.pattern_to_ai_lambda_arn  # Use the full ARN
+  function_name = split(":", var.pattern_to_ai_lambda_arn)[6]  # Extract function name from ARN
   principal     = "apigateway.amazonaws.com"
   # More specific source ARN for this endpoint
   source_arn    = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.pattern_to_ai_http_method.http_method}${aws_api_gateway_resource.pattern_to_ai_gateway_resource.path}"
@@ -160,7 +160,7 @@ resource "aws_lambda_permission" "pattern_to_ai_api_permission" {
 resource "aws_lambda_permission" "audio_to_ai_api_permission" {
   statement_id  = "AllowAPIGatewayToInvokeAudioToAi"
   action        = "lambda:InvokeFunction"
-  function_name = var.audio_to_ai_lambda_arn  # Use the full ARN
+  function_name = split(":", var.audio_to_ai_lambda_arn)[6]  # Extract function name from ARN
   principal     = "apigateway.amazonaws.com"
   # More specific source ARN for this endpoint
   source_arn    = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.audio_to_ai_http_method.http_method}${aws_api_gateway_resource.audio_to_ai_gateway_resource.path}"
