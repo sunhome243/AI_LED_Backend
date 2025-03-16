@@ -16,12 +16,12 @@ variable "stage_name" {
 
 variable "pattern_to_ai_lambda_arn" {
   type        = string
-  description = "pattern to ai lambda_arn"
+  description = "ARN of pattern_to_ai lambda function"
 }
 
 variable "audio_to_ai_lambda_arn" {
   type        = string
-  description = "audio to ai lambda arn"
+  description = "ARN of audio_to_ai lambda function"
 }
 
 variable "gateway_role_arn" {
@@ -31,5 +31,5 @@ variable "gateway_role_arn" {
 
 variable "isConnect_lambda_arn" {
   type        = string
-  description = "isConnect lambda arn"
+  description = "ARN of isConnect lambda function"
 }
