@@ -167,6 +167,26 @@ resource "aws_iam_policy" "api_gateway_logging_policy" {
   })
 }
 
+# Add new Lambda-to-Lambda invocation policy
+resource "aws_iam_policy" "lambda_to_lambda_policy" {
+  name        = "lambda_to_lambda_policy"
+  description = "Allow Lambda functions to invoke other Lambda functions"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:InvokeFunction",
+          "lambda:InvokeAsync"
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:lambda:*:*:function:*"  # Consider restricting to specific functions for better security
+      }
+    ]
+  })
+}
+
 # Attach all policies to Lambda role
 resource "aws_iam_role_policy_attachment" "lambda_apigateway_attachment" {
   role       = aws_iam_role.iam_for_lambda.name
@@ -203,4 +223,10 @@ resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch_attachment" {
 resource "aws_iam_role_policy_attachment" "api_gateway_lambda_invoke_attachment" {
   role       = aws_iam_role.api_gateway_role.name
   policy_arn = aws_iam_policy.lambda_invoke_policy.arn
+}
+
+# Attach Lambda-to-Lambda invocation policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_to_lambda_attachment" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_to_lambda_policy.arn
 }
