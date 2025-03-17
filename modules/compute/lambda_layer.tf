@@ -1,3 +1,10 @@
+# Create the layer directory structure before installing dependencies
+resource "local_file" "ensure_layer_dir_exists" {
+  content     = ""
+  filename    = "${path.module}/layer/python/.keep"
+  file_permission = "0644"
+}
+
 resource "null_resource" "install_dependencies" {
   triggers = {
     ai_requirements_hash = sha256(file("${local.base_dir}/lambda/pattern_to_ai/requirements.txt"))
@@ -5,12 +12,12 @@ resource "null_resource" "install_dependencies" {
 
   provisioner "local-exec" {
     command = <<EOT
-      # create new directory for the layer
-      mkdir -p "${path.module}/layer/python"
       # install dependencies directly from requirements.txt
       pip install -r "${local.base_dir}/lambda/pattern_to_ai/requirements.txt" -t "${path.module}/layer/python/"
     EOT
   }
+  
+  depends_on = [local_file.ensure_layer_dir_exists]
 }
 
 # create lambda layer zip file
@@ -20,7 +27,7 @@ data "archive_file" "lambda_layer_zip" {
   output_path = "${path.module}/archive/lambda_layer_${sha256(
     fileexists("${local.base_dir}/lambda/pattern_to_ai/requirements.txt") ? file("${local.base_dir}/lambda/pattern_to_ai/requirements.txt") : ""
   )}.zip"
-  depends_on  = [null_resource.install_dependencies]
+  depends_on  = [null_resource.install_dependencies, local_file.ensure_layer_dir_exists]
 }
 
 # Create lambda layer
