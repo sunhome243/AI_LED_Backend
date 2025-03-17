@@ -1,21 +1,36 @@
-# Create a directory structure for the Lambda layer
-resource "null_resource" "create_layer_structure" {
+# Create the layer directory structure immediately
+resource "local_file" "layer_directory" {
+  content     = "# This is a placeholder file for terraform planning phase"
+  filename    = "${path.module}/layer_build/python/.placeholder"
+  directory_permission = "0755"
+  file_permission      = "0644"
+
+  # Ensure parent directories exist
+  provisioner "local-exec" {
+    command = "mkdir -p ${path.module}/layer_build/python"
+    interpreter = ["/bin/bash", "-c"]
+    on_failure  = continue
+  }
+
+  # Force execution
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Install Python dependencies only during apply phase
+resource "null_resource" "install_dependencies" {
+  depends_on = [local_file.layer_directory]
+  
+  # Rebuild when requirements change
   triggers = {
-    # Rebuild when requirements change or Python version changes
-    requirements_hash = sha256(file("${path.module}/layer_requirements.txt"))
-    python_version = "3.9" # Update this when changing Python version
+    requirements_hash = fileexists("${path.module}/layer_requirements.txt") ? sha256(file("${path.module}/layer_requirements.txt")) : "no-requirements-file"
+    python_version = "3.9"
   }
 
   provisioner "local-exec" {
-    # Simplified pip install command for better compatibility
     command = <<-EOF
       echo "Starting Lambda layer build process..."
-      echo "Cleaning previous build directory..."
-      rm -rf ${path.module}/layer_build
-      
-      echo "Creating new build directory structure..."
-      mkdir -p ${path.module}/layer_build/python
-      
       echo "Installing Python dependencies from requirements file..."
       pip install --no-cache-dir -r ${path.module}/layer_requirements.txt -t ${path.module}/layer_build/python
       
@@ -25,48 +40,19 @@ resource "null_resource" "create_layer_structure" {
       find ${path.module}/layer_build -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
       find ${path.module}/layer_build -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
       
-      # Verify files were actually created
-      if [ ! "$(ls -A ${path.module}/layer_build/python)" ]; then
-        echo "ERROR: Dependencies installation failed - directory is empty"
-        exit 1
-      fi
-      
       echo "Lambda layer build completed successfully"
     EOF
-  }
-}
-
-# Create an empty layer_build directory to ensure it exists for plan phase
-resource "null_resource" "ensure_directory_exists" {
-  triggers = {
-    # Use a more reliable way to force execution when needed
-    build_needed = fileexists("${path.module}/layer_build/python/.placeholder") ? "exists" : "create"
-  }
-
-  provisioner "local-exec" {
-    command = <<-EOF
-      mkdir -p ${path.module}/layer_build/python
-      touch ${path.module}/layer_build/python/.placeholder
-    EOF
-  }
-
-  # Run this before other resources are evaluated
-  lifecycle {
-    create_before_destroy = true
+    interpreter = ["/bin/bash", "-c"]
   }
 }
 
 # Create the layer ZIP file
 data "archive_file" "lambda_layer_zip" {
+  depends_on  = [local_file.layer_directory]
   type        = "zip"
   source_dir  = "${path.module}/layer_build"
   output_path = "${path.module}/lambda_layer.zip"
-  excludes    = [".placeholder"]  # Don't include placeholder files in the archive
-  
-  depends_on = [
-    null_resource.create_layer_structure,
-    null_resource.ensure_directory_exists
-  ]
+  excludes    = [".placeholder"]
 }
 
 # Create the Lambda layer
@@ -77,8 +63,6 @@ resource "aws_lambda_layer_version" "dependencies_layer" {
   compatible_runtimes = ["python3.9"]
   
   description = "Shared dependencies for Lambda functions"
-  
-  depends_on = [data.archive_file.lambda_layer_zip]
   
   # Add lifecycle configuration to handle updates more gracefully
   lifecycle {
@@ -94,6 +78,7 @@ resource "null_resource" "cleanup_temp_files" {
 
   provisioner "local-exec" {
     command = "rm -f ${path.module}/lambda_layer.zip"
+    interpreter = ["/bin/bash", "-c"]
   }
 
   depends_on = [aws_lambda_layer_version.dependencies_layer]

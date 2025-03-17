@@ -9,3 +9,6 @@ provider "null" {}
 # Archive provider for creating zip files
 provider "archive" {}
 
+# Local provider for file operations
+provider "local" {}
+
