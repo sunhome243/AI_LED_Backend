@@ -18,29 +18,27 @@ resource "null_resource" "prepare_lambda_layer" {
       echo "Creating layer structure..."
       mkdir -p ${path.module}/layer_build/python
       
-      # Install dependencies with pip using --platform to target Lambda environment
+      # Show the contents of the requirements file
+      echo "Requirements file contents:"
+      cat ${path.module}/layer_requirements.txt
+      
+      # Install dependencies with pip using a more reliable approach
       echo "Installing dependencies..."
-      pip install \
-        --platform manylinux2014_x86_64 \
-        --target=${path.module}/layer_build/python \
-        --implementation cp \
-        --python-version 3.9 \
-        --only-binary=:all: \
+      python -m pip install \
+        --no-cache-dir \
         --upgrade \
-        -r ${path.module}/layer_requirements.txt
+        -r ${path.module}/layer_requirements.txt \
+        --target ${path.module}/layer_build/python
       
-      # Quick check for essential packages
-      if [ ! -d "${path.module}/layer_build/python/pydantic" ]; then
-        echo "WARNING: pydantic package may be missing"
+      # Check if installation was successful
+      if [ $? -ne 0 ]; then
+        echo "Error: Failed to install Python dependencies"
+        exit 1
       fi
       
-      # Check specifically for pydantic_core
-      if [ -d "${path.module}/layer_build/python/pydantic_core" ]; then
-        echo "pydantic_core is present"
-        ls -la ${path.module}/layer_build/python/pydantic_core/
-      else
-        echo "WARNING: pydantic_core directory not found"
-      fi
+      # List the installed dependencies to verify they were installed
+      echo "Installed dependencies:"
+      ls -la ${path.module}/layer_build/python
       
       # Clean unnecessary files to reduce layer size
       find ${path.module}/layer_build/python -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -79,7 +77,7 @@ resource "null_resource" "cleanup_temp_files" {
   }
 
   provisioner "local-exec" {
-    command = "rm -f ${path.module}/lambda_layer.zip"
+    command = "rm -rf ${path.module}/lambda_layer.zip ${path.module}/layer_build"
     interpreter = ["/bin/bash", "-c"]
   }
 
