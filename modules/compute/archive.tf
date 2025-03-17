@@ -26,7 +26,7 @@ locals {
   # Add isConnect files to file detection
   isConnect_files = [
     for file in fileset("${local.base_dir}/lambda/websocket", "**") : 
-    "${local.base_dir}/lambda/websocket/${file}"
+    "${local.base_dir}/lambda/websocket/${file}" if file == "isConnect.py"
   ]
   
   # Calculate hash of source files to detect changes more reliably
@@ -38,12 +38,6 @@ locals {
   
   # Calculate hash for isConnect
   isConnect_source_hash = sha256(join("", [for f in local.isConnect_files : filesha256(f)]))
-  
-  # Use archive output hash for Lambda functions
-  audio_to_ai_hash = data.archive_file.audio_to_ai_lambda.output_base64sha256
-  pattern_to_ai_hash = data.archive_file.pattern_to_ai_lambda.output_base64sha256
-  result_save_send_hash = data.archive_file.result_save_send_lambda.output_base64sha256
-  ws_messenger_hash = data.archive_file.ws_messenger_zip.output_base64sha256
 }
 
 # Ensure archive directory exists
@@ -53,7 +47,7 @@ resource "local_file" "ensure_archive_dir" {
   file_permission = "0644"
 }
 
-# Create deployment packages for Lambda functions with explicit triggers based on source hash
+# package only the necessary files for each Lambda function
 data "archive_file" "audio_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/audio_to_ai"

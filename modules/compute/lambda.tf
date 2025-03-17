@@ -13,6 +13,9 @@ resource "aws_lambda_function" "audio_to_ai" {
   source_code_hash = data.archive_file.audio_to_ai_lambda.output_base64sha256
   memory_size      = 128
   timeout          = 30
+  
+  # shared lambda layer conneciton
+  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
 
   environment {
     variables = local.lambda_functions.audio_to_ai.environment
@@ -28,6 +31,9 @@ resource "aws_lambda_function" "pattern_to_ai" {
   source_code_hash = data.archive_file.pattern_to_ai_lambda.output_base64sha256
   memory_size      = 128
   timeout          = 30
+  
+  # shared lambda layer connection
+  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
 
   environment {
     variables = local.lambda_functions.pattern_to_ai.environment
