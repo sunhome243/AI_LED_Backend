@@ -5,7 +5,7 @@ import shortuuid
 from datetime import datetime, timedelta
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
-import google.generativeai as genai
+from google import genai
 from get_gemini_config_surprise_me import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
 

@@ -5,7 +5,7 @@ import base64
 import shortuuid
 from datetime import datetime
 from boto3.session import Session
-import google.generativeai as genai
+from google import genai
 from gemini_config import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
 

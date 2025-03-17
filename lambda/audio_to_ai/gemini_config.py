@@ -1,70 +1,70 @@
 from google import genai
-from google.genai import types
+
 
 def get_gemini_config():
     """
     Returns the configuration for the Gemini AI model.
-    
+
     Returns:
         GenerateContentConfig: The configuration for the Gemini AI model.
     """
-    return types.GenerateContentConfig(
+    return genai.types.GenerateContentConfig(
         temperature=0.65,
         top_p=0.95,
         top_k=40,
         max_output_tokens=8192,
         response_mime_type="application/json",
         response_schema=genai.types.Schema(
-            type = genai.types.Type.OBJECT,
-            enum = [],
-            required = ["lightSetting", "emotion", "recommendation", "context"],
-            properties = {
+            type=genai.types.Type.OBJECT,
+            enum=[],
+            required=["lightSetting", "emotion", "recommendation", "context"],
+            properties={
                 "lightSetting": genai.types.Schema(
-                    type = genai.types.Type.OBJECT,
-                    enum = [],
-                    required = ["power"],
-                    properties = {
+                    type=genai.types.Type.OBJECT,
+                    enum=[],
+                    required=["power"],
+                    properties={
                         "color": genai.types.Schema(
-                            type = genai.types.Type.ARRAY,
-                            items = genai.types.Schema(
-                                type = genai.types.Type.STRING,
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
                             ),
                         ),
                         "power": genai.types.Schema(
-                            type = genai.types.Type.BOOLEAN,
+                            type=genai.types.Type.BOOLEAN,
                         ),
                         "dynamic": genai.types.Schema(
-                            type = genai.types.Type.STRING,
+                            type=genai.types.Type.STRING,
                         ),
                     },
                 ),
                 "emotion": genai.types.Schema(
-                    type = genai.types.Type.OBJECT,
-                    description = "Emotion analysis result",
-                    enum = [],
-                    required = ["main", "subcategories"],
-                    properties = {
+                    type=genai.types.Type.OBJECT,
+                    description="Emotion analysis result",
+                    enum=[],
+                    required=["main", "subcategories"],
+                    properties={
                         "main": genai.types.Schema(
-                            type = genai.types.Type.STRING,
+                            type=genai.types.Type.STRING,
                         ),
                         "subcategories": genai.types.Schema(
-                            type = genai.types.Type.ARRAY,
-                            items = genai.types.Schema(
-                                type = genai.types.Type.STRING,
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
                             ),
                         ),
                     },
                 ),
                 "recommendation": genai.types.Schema(
-                    type = genai.types.Type.STRING,
+                    type=genai.types.Type.STRING,
                 ),
                 "context": genai.types.Schema(
-                    type = genai.types.Type.STRING,
+                    type=genai.types.Type.STRING,
                 ),
             },
         ),
         system_instruction=[
-            types.Part.from_text(
+            genai.types.Part.from_text(
                 text="""# Personalized Lighting Assistant
 
 You are an AI that analyzes audio input to create personalized lighting recommendations based on emotional state, context, and time of day.

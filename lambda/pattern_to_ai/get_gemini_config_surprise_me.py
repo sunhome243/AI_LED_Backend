@@ -1,5 +1,4 @@
 from google import genai
-from google.genai import types
 
 
 def get_gemini_config():
@@ -9,7 +8,7 @@ def get_gemini_config():
     Returns:
         GenerateContentConfig: The configuration for the Gemini AI model.
     """
-    return types.GenerateContentConfig(
+    return genai.types.GenerateContentConfig(
         temperature=0.85,
         top_p=0.95,
         top_k=40,
@@ -65,7 +64,7 @@ def get_gemini_config():
             },
         ),
         system_instruction=[
-            types.Part.from_text(
+            genai.types.Part.from_text(
                 text="""Adaptive Personalized Lighting Assistant
 
 You are an AI that predicts and personalizes lighting based on broad time patterns, emotional state, and user context. Instead of matching exact timestamps, you analyze general trends to infer the most likely current activity. The AI must select either RGB color or Dynamic mode—never both.
