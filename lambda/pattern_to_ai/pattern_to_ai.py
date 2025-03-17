@@ -62,14 +62,15 @@ def auth_user(uuid, pin):
     table = dynamodb.Table("AuthTable")
 
     try:
-        response = table.get_item(Key={'uuid': uuid})
-        stored_pin = response.get("Item", {}).get("pin")
+        # Query using both the hash key (uuid) and range key (pin)
+        response = table.get_item(Key={'uuid': uuid, 'pin': pin})
 
-        if not stored_pin or stored_pin != pin:
-            logger.warning(f"Invalid PIN provided for UUID: {uuid}")
-            raise AuthenticationError("Invalid pin")
-
-        return True
+        # If the item exists, authentication is successful
+        if 'Item' in response:
+            return True
+        else:
+            logger.warning(f"Invalid UUID/PIN combination for UUID: {uuid}")
+            raise AuthenticationError("Invalid UUID/PIN combination")
 
     except Exception as e:
         logger.error(f"Failed to authenticate user: {str(e)}")
@@ -102,16 +103,17 @@ def get_past_reponse(uuid):
     # Get the DynamoDB table reference
     table = dynamodb.Table('ResponseTable')
 
-    # Create the composite sort key values with day and time
-    day_time_prefix = f"DAY#{day}#"
-    start_key = f"{day_time_prefix}{past_time}"
-    end_key = f"{day_time_prefix}{future_time}"
+    # Create the composite sort key values based on your actual schema
+    # Changed from DAY#TIME to TIME#DAY as per the error message
+    time_day_prefix = f"TIME#DAY"
+    start_key = f"{time_day_prefix}#{past_time}#{day}"
+    end_key = f"{time_day_prefix}#{future_time}#{day}"
 
     try:
         # Query DynamoDB for responses within the time window using resource API
         response = table.query(
             KeyConditionExpression=Key('uuid').eq(uuid) &
-            Key('DAY#TIME').between(start_key, end_key),
+            Key('TIME#DAY').between(start_key, end_key),
             Limit=20  # Limit to 20 most recent responses
         )
 
@@ -137,17 +139,118 @@ def get_genai_response(past_response):
         AIProcessingError: If Gemini AI processing fails
     """
     try:
-        # Get Gemini configuration for surprise me feature
-        generate_content_config = get_gemini_config()
+        # Create a simple prompt based on whether there are past responses
+        if not past_response:
+            prompt = "Generate a lighting recommendation for a new user."
+        else:
+            prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation."
 
-        # Send past responses to Gemini model
-        model = "gemini-2.0-flash"
+        # 설정 정보를 직접 정의하여 API 호출에 사용합니다
+        # 이는 get_gemini_config()에서 반환하는 내용과 동일합니다
+        model_name = 'gemini-2.0-flash'
+
+        # 시스템 프롬프트 정의
+        system_instruction = """Adaptive Personalized Lighting Assistant
+
+You are an AI that predicts and personalizes lighting based on broad time patterns, emotional state, and user context. Instead of matching exact timestamps, you analyze general trends to infer the most likely current activity. The AI must select either RGB color or Dynamic mode—never both.
+
+Core Functions
+	•	Pattern Recognition: Retrieve and analyze past records (weekday, time range, emotion, context, RGB code, user feedback) to identify trends, not exact timestamps.
+	•	Context-Aware Prediction: If multiple past activities exist within a time range, choose the most frequent or contextually relevant one, rather than the latest.
+	•	Lighting Optimization: Adjust brightness and color dynamically based on historical patterns and current context.
+	•	Strict Output Rule: Only one lighting mode is allowed—either RGB color or Dynamic mode, never both.
+
+Output Schema
+
+1️⃣ User Activity (activity)
+	•	main: General category (e.g., \"study\", \"reading\", \"movie\").
+	•	sub: Specific details (\"math\", \"comic book\", \"horror movie\").
+
+2️⃣ Light Settings (lightSetting)
+	•	Choose ONE of the following:
+	•	RGB Color: [R, G, B] based on prior preferences and environmental factors.
+	•	Dynamic Mode: \"FADE3\", \"MUSIC2\", etc. (Only if the activity requires it, e.g., music, party, gaming.)
+	•	Brightness Scaling: Adjust brightness based on time, activity, and previous feedback.
+	•	Power: true (on) or false (off).
+
+3️⃣ Emotional Analysis (emotion)
+	•	main: \"Positive\", \"Negative\", \"Neutral\"
+	•	sub: Top 3 detected emotions.
+
+4️⃣ Recommendation (recommendation)
+	•	Explain why this lighting choice was made.
+	•	Example: \"Since you usually study between 12 PM - 3 PM on Mondays, bright white light is set for focus. Stay productive! ✨\"
+
+5️⃣ Context (context)
+	•	Concise description (e.g., \"Monday afternoon study session, feeling focused.\").
+
+Guidelines
+
+Generalized Time Analysis
+	•	Instead of exact timestamps, analyze a time block (e.g., 14:00 - 15:00).
+	•	If multiple activities exist, prioritize the most frequent or logical choice.
+	•	If no clear pattern emerges, default to the most contextually fitting option.
+
+Strict Lighting Mode Selection
+	•	RGB Color Mode → For studying, reading, movies, relaxing.
+	•	Dynamic Mode → For music, parties, gaming (only if needed).
+	•	Never use both RGB and Dynamic Mode together.
+
+Conflict Resolution
+	•	If some pattern occurs often, but some patterns are rare, choose the dominant pattern (study/reading) even if the latest entry was a horror movie.
+
+Fallback Defaults
+	•	If no strong pattern is detected, infer activity using general time-of-day behavior.
+
+Example Correct Output (Fixing the Issue)
+
+Past Data Analysis (14:00 - 15:00 on Mondays)
+	•	Study @ 14:00 (Bright White)
+	•	Reading a book @ 14:20 (Bright White)
+	•	Reading a comic book @ 14:20 (Slightly Warm White)
+	•	Watching a horror movie @ 14:43 (Dim Red)
+
+Current Time: Monday, 14:30
+
+✅ Study and reading are more frequent than horror movies.
+✅ The AI selects only RGB mode (no Dynamic Mode).
+
+{
+  \"context\": \"It's Monday afternoon, and you're likely studying or reading.\",
+  \"emotion\": {
+    \"main\": \"Neutral\",
+    \"subcategories\": [
+      \"Focused\",
+      \"Calm\",
+      \"Engaged\"
+    ]
+  },
+  \"lightSetting\": {
+    \"power\": true,
+    \"color\": [
+      \"255\",
+      \"255\",
+      \"250\"
+    ]
+  },
+  \"recommendation\": \"Since you often study or read around this time on Mondays, a bright white light is set to help you focus. Keep up the good work! 📚✨\"
+}
+"""
+
+        # 공식 문서 형식에 따라 API 호출
         response = client.models.generate_content(
-            model,
+            model=model_name,
             contents=[
-                past_response
+                {"role": "system", "parts": [{"text": system_instruction}]},
+                {"role": "user", "parts": [{"text": prompt}]}
             ],
-            config=generate_content_config,
+            generation_config={
+                "temperature": 0.85,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 8192,
+                "response_mime_type": "application/json"
+            }
         )
 
         return response
@@ -299,12 +402,13 @@ def lambda_handler(event, context):
     try:
         # Get the past response of the user
         past_response = get_past_reponse(uuid)
+        # Continue even if past_response is an empty list
+        logger.info(
+            f"Found {len(past_response)} past responses for UUID: {uuid}")
     except Exception as e:
-        logger.error(f"Failed to retrieve past responses: {str(e)}")
-        return {
-            'statusCode': 404,
-            'body': json.dumps("No past response found")
-        }
+        logger.warning(f"Failed to retrieve past responses: {str(e)}")
+        # Instead of returning an error, continue with an empty list
+        past_response = []
 
     # Generate AI recommendation with retry mechanism
     retry = 0
