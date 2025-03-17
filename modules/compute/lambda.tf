@@ -49,6 +49,9 @@ resource "aws_lambda_function" "result_save_send" {
   source_code_hash = data.archive_file.result_save_send_lambda.output_base64sha256
   memory_size      = 256  # Increase memory for better performance
   timeout          = 30   # Increase timeout to handle async operations
+  
+  # Add the shared layer
+  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
 
   environment {
     variables = local.lambda_functions.result_save_send.environment

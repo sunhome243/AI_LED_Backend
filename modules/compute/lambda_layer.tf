@@ -1,4 +1,3 @@
-# 공통 레이어와 함수별 레이어 생성
 resource "null_resource" "install_dependencies" {
   triggers = {
     ai_requirements_hash = sha256(file("${local.base_dir}/lambda/pattern_to_ai/requirements.txt"))
@@ -6,10 +5,10 @@ resource "null_resource" "install_dependencies" {
 
   provisioner "local-exec" {
     command = <<EOT
-      # 공유 레이어 디렉토리 생성
+      # create new directory for the layer
       mkdir -p "${path.module}/layer/python"
-      # 레이어에 필요한 패키지만 설치 (boto3는 Lambda 런타임에 이미 포함됨)
-      pip install protobuf==3.20.3 shortuuid==1.0.13 -t "${path.module}/layer/python/"
+      # install dependencies directly from requirements.txt
+      pip install -r "${local.base_dir}/lambda/pattern_to_ai/requirements.txt" -t "${path.module}/layer/python/"
     EOT
   }
 }
@@ -31,5 +30,5 @@ resource "aws_lambda_layer_version" "dependencies_layer" {
   source_code_hash    = data.archive_file.lambda_layer_zip.output_base64sha256
   compatible_runtimes = ["python3.9"]
   
-  description = "Shared dependencies layer for Lambda functions (protobuf, shortuuid)"
+  description = "Shared dependencies layer for Lambda functions (protobuf, shortuuid, google-generativeai)"
 }
