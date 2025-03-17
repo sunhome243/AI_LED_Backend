@@ -52,14 +52,14 @@ data "archive_file" "audio_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/audio_to_ai"
   output_path = "${path.module}/archive/audio_to_ai_${local.audio_to_ai_source_hash}.zip"
-  depends_on  = [null_resource.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir, aws_lambda_layer_version.dependencies_layer]
 }
 
 data "archive_file" "pattern_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/pattern_to_ai"
   output_path = "${path.module}/archive/pattern_to_ai_${local.pattern_to_ai_source_hash}.zip"
-  depends_on  = [null_resource.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir, aws_lambda_layer_version.dependencies_layer]
 }
 
 data "archive_file" "result_save_send_lambda" {

@@ -14,8 +14,9 @@ resource "aws_lambda_function" "audio_to_ai" {
   memory_size      = 128
   timeout          = 30
   
-  # shared lambda layer conneciton
+  # Ensure layer is attached and dependency is explicit
   layers           = [aws_lambda_layer_version.dependencies_layer.arn]
+  depends_on       = [aws_lambda_layer_version.dependencies_layer]
 
   environment {
     variables = local.lambda_functions.audio_to_ai.environment
@@ -32,8 +33,9 @@ resource "aws_lambda_function" "pattern_to_ai" {
   memory_size      = 128
   timeout          = 30
   
-  # shared lambda layer connection
+  # Ensure layer is attached and dependency is explicit
   layers           = [aws_lambda_layer_version.dependencies_layer.arn]
+  depends_on       = [aws_lambda_layer_version.dependencies_layer]
 
   environment {
     variables = local.lambda_functions.pattern_to_ai.environment
@@ -50,8 +52,9 @@ resource "aws_lambda_function" "result_save_send" {
   memory_size      = 256  # Increase memory for better performance
   timeout          = 30   # Increase timeout to handle async operations
   
-  # Add the shared layer
+  # Ensure layer is attached and dependency is explicit
   layers           = [aws_lambda_layer_version.dependencies_layer.arn]
+  depends_on       = [aws_lambda_layer_version.dependencies_layer]
 
   environment {
     variables = local.lambda_functions.result_save_send.environment
