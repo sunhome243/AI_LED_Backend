@@ -40,11 +40,11 @@ locals {
   isConnect_source_hash = sha256(join("", [for f in local.isConnect_files : filesha256(f)]))
 }
 
-# Ensure archive directory exists
-resource "local_file" "ensure_archive_dir" {
-  content     = ""
-  filename    = "${path.module}/archive/.keep"
-  file_permission = "0644"
+# Create archive directory with proper permissions
+resource "null_resource" "ensure_archive_dir" {
+  provisioner "local-exec" {
+    command = "mkdir -p ${path.module}/archive && chmod 755 ${path.module}/archive"
+  }
 }
 
 # package only the necessary files for each Lambda function
@@ -52,33 +52,33 @@ data "archive_file" "audio_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/audio_to_ai"
   output_path = "${path.module}/archive/audio_to_ai_${local.audio_to_ai_source_hash}.zip"
-  depends_on  = [local_file.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir]
 }
 
 data "archive_file" "pattern_to_ai_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/pattern_to_ai"
   output_path = "${path.module}/archive/pattern_to_ai_${local.pattern_to_ai_source_hash}.zip"
-  depends_on  = [local_file.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir]
 }
 
 data "archive_file" "result_save_send_lambda" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/result_save_send"
   output_path = "${path.module}/archive/result_save_send_${local.result_save_send_source_hash}.zip"
-  depends_on  = [local_file.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir]
 }
 
 data "archive_file" "ws_messenger_zip" {
   type        = "zip"
   source_dir  = "${local.base_dir}/lambda/websocket"
   output_path = "${path.module}/archive/ws_messenger_${local.ws_messenger_source_hash}.zip"
-  depends_on  = [local_file.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir]
 }
 
 data "archive_file" "isConnect_lambda" {
   type        = "zip"
   source_file = "${local.base_dir}/lambda/websocket/isConnect.py"
   output_path = "${path.module}/archive/isConnect_${local.isConnect_source_hash}.zip"
-  depends_on  = [local_file.ensure_archive_dir]
+  depends_on  = [null_resource.ensure_archive_dir]
 }

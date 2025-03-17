@@ -13,6 +13,9 @@ locals {
     isConnect       = "is-connect"  # Added isConnect function
   }
 
+  # Base directory reference
+  base_dir = abspath("${path.root}")
+
   # Lambda function configurations
   lambda_functions = {
     audio_to_ai = {
