@@ -1,4 +1,10 @@
-# Simplified Lambda layer creation process
+# Simplified Lambda layer creation without Docker
+
+# Generate a requirements file from our specified dependencies
+resource "local_file" "python_requirements" {
+  content  = file("${path.module}/layer_requirements.txt")
+  filename = "${path.module}/build_requirements.txt"
+}
 
 # Create the layer directory structure
 resource "null_resource" "prepare_lambda_layer" {
@@ -8,18 +14,38 @@ resource "null_resource" "prepare_lambda_layer" {
 
   provisioner "local-exec" {
     command = <<-EOF
-      # Create directory structure and install dependencies
+      # Create directory structure
+      echo "Creating layer structure..."
       mkdir -p ${path.module}/layer_build/python
-      pip install -r ${path.module}/layer_requirements.txt -t ${path.module}/layer_build/python --no-cache-dir
+      
+      # Install dependencies with pip using --platform to target Lambda environment
+      echo "Installing dependencies..."
+      pip install \
+        --platform manylinux2014_x86_64 \
+        --target=${path.module}/layer_build/python \
+        --implementation cp \
+        --python-version 3.9 \
+        --only-binary=:all: \
+        --upgrade \
+        -r ${path.module}/layer_requirements.txt
       
       # Quick check for essential packages
-      if [ ! -d "${path.module}/layer_build/python/shortuuid" ]; then
-        echo "ERROR: shortuuid package missing from installation"
-        exit 1
+      if [ ! -d "${path.module}/layer_build/python/pydantic" ]; then
+        echo "WARNING: pydantic package may be missing"
+      fi
+      
+      # Check specifically for pydantic_core
+      if [ -d "${path.module}/layer_build/python/pydantic_core" ]; then
+        echo "pydantic_core is present"
+        ls -la ${path.module}/layer_build/python/pydantic_core/
+      else
+        echo "WARNING: pydantic_core directory not found"
       fi
       
       # Clean unnecessary files to reduce layer size
       find ${path.module}/layer_build/python -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+      find ${path.module}/layer_build/python -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+      find ${path.module}/layer_build/python -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
     EOF
     interpreter = ["/bin/bash", "-c"]
   }
