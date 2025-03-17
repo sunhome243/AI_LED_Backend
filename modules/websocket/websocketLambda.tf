@@ -21,6 +21,7 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
   source_code_hash = data.archive_file.ws_messenger_zip.output_base64sha256
   memory_size      = 128
   timeout          = 10
+  layers           = [var.lambda_layer_arn]
   
   environment {
     variables = {
@@ -31,12 +32,24 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
 
 # Resource removed to avoid duplication with the one in websocketGateway.tf
 
+# Create directory for archives if it doesn't exist
+resource "null_resource" "ensure_ws_archive_dir" {
+  triggers = {
+    always_run = timestamp()
+  }
+
+  provisioner "local-exec" {
+    command = "mkdir -p ${path.module}/archive"
+  }
+}
+
 # Archive resource for Lambda code with unique filename based on hash
 data "archive_file" "ws_messenger_zip" {
   type        = "zip"
   source_file = "${local.base_dir}/lambda/websocket/connection_manager.py"
   output_path = "${path.module}/archive/ws_messenger_${local.ws_messenger_source_hash}.zip"
   output_file_mode = "0644"
+  depends_on  = [null_resource.ensure_ws_archive_dir]
 }
 
 resource "aws_cloudwatch_log_group" "ws_messenger_logs" {

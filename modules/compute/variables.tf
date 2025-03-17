@@ -39,3 +39,8 @@ variable "rest_api_execution_arn" {
   description = "Execution ARN of the REST API Gateway"
   default     = ""
 }
+
+variable "lambda_layer_arn" {
+  type        = string
+  description = "ARN of the Lambda layer containing Python dependencies"
+}

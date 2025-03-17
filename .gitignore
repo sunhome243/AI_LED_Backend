@@ -39,3 +39,10 @@ terraform.rc
 
 myvenv
 .env
+
+# Ignore layer directory and zip file
+layer/
+lambda_layer.zip
+
+modules/compute/archive/*
+modules/websocket/archive/*

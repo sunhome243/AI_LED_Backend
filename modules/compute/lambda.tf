@@ -13,10 +13,7 @@ resource "aws_lambda_function" "audio_to_ai" {
   source_code_hash = data.archive_file.audio_to_ai_lambda.output_base64sha256
   memory_size      = 128
   timeout          = 30
-  
-  # Ensure layer is attached and dependency is explicit
-  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
-  depends_on       = [aws_lambda_layer_version.dependencies_layer]
+  layers           = [var.lambda_layer_arn]
 
   environment {
     variables = local.lambda_functions.audio_to_ai.environment
@@ -32,10 +29,7 @@ resource "aws_lambda_function" "pattern_to_ai" {
   source_code_hash = data.archive_file.pattern_to_ai_lambda.output_base64sha256
   memory_size      = 128
   timeout          = 30
-  
-  # Ensure layer is attached and dependency is explicit
-  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
-  depends_on       = [aws_lambda_layer_version.dependencies_layer]
+  layers           = [var.lambda_layer_arn]
 
   environment {
     variables = local.lambda_functions.pattern_to_ai.environment
@@ -51,10 +45,7 @@ resource "aws_lambda_function" "result_save_send" {
   source_code_hash = data.archive_file.result_save_send_lambda.output_base64sha256
   memory_size      = 256  # Increase memory for better performance
   timeout          = 30   # Increase timeout to handle async operations
-  
-  # Ensure layer is attached and dependency is explicit
-  layers           = [aws_lambda_layer_version.dependencies_layer.arn]
-  depends_on       = [aws_lambda_layer_version.dependencies_layer]
+  layers           = [var.lambda_layer_arn]
 
   environment {
     variables = local.lambda_functions.result_save_send.environment
@@ -70,6 +61,7 @@ resource "aws_lambda_function" "isConnect" {
   source_code_hash = data.archive_file.isConnect_lambda.output_base64sha256
   memory_size      = 128
   timeout          = 10
+  layers           = [var.lambda_layer_arn]
 
   environment {
     variables = local.lambda_functions.isConnect.environment

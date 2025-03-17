@@ -12,3 +12,8 @@ variable "api_gateway_role_arn" {
   description = "ARN of the IAM role for API Gateway"
   type        = string
 }
+
+variable "lambda_layer_arn" {
+  description = "ARN of the Lambda layer containing Python dependencies"
+  type        = string
+}
