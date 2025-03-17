@@ -7,7 +7,7 @@ resource "null_resource" "create_layer_structure" {
   }
 
   provisioner "local-exec" {
-    # Enhanced logging and error handling with more cross-platform compatibility
+    # Enhanced command with better dependency handling
     command = <<-EOF
       echo "Starting Lambda layer build process..."
       echo "Cleaning previous build directory..."
@@ -17,7 +17,7 @@ resource "null_resource" "create_layer_structure" {
       mkdir -p ${path.module}/layer_build/python
       
       echo "Installing Python dependencies from requirements file..."
-      pip install --no-cache-dir -r ${path.module}/layer_requirements.txt -t ${path.module}/layer_build/python
+      pip install --no-cache-dir --platform manylinux2014_x86_64 --implementation cp --python-version 3.9 --only-binary=:all: -r ${path.module}/layer_requirements.txt -t ${path.module}/layer_build/python
       
       # Remove unnecessary files to reduce layer size
       echo "Cleaning up unnecessary files..."
