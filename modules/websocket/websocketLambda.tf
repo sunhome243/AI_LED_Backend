@@ -30,23 +30,10 @@ resource "aws_lambda_function" "ws_messenger_lambda" {
   }
 }
 
-# Resource removed to avoid duplication with the one in websocketGateway.tf
-
-# Create directory for archives if it doesn't exist
-resource "null_resource" "ensure_ws_archive_dir" {
-  triggers = {
-    always_run = timestamp()
-  }
-
-  provisioner "local-exec" {
-    command = "mkdir -p ${path.module}/archive"
-  }
-}
-
 # Archive resource for Lambda code with unique filename based on hash
 data "archive_file" "ws_messenger_zip" {
   type        = "zip"
-  source_file = "${local.base_dir}/lambda/websocket/connection_manager.py"
+  source_dir  = "${local.base_dir}/lambda/websocket"  # Changed to source_dir for better handling
   output_path = "${path.module}/archive/ws_messenger_${local.ws_messenger_source_hash}.zip"
   output_file_mode = "0644"
   depends_on  = [null_resource.ensure_ws_archive_dir]

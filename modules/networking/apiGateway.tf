@@ -322,33 +322,26 @@ resource "aws_api_gateway_method_response" "is_connect_response" {
 
 # API Gateway Deployment with improved dependency handling and timeouts
 resource "aws_api_gateway_deployment" "deploy" {
-  depends_on = [
-    aws_api_gateway_integration.pattern_to_ai_api_int,
-    aws_api_gateway_integration.audio_to_ai_api_int,
-    aws_api_gateway_integration.is_connect_api_int,
-    aws_api_gateway_method_response.pattern_to_ai_response,
-    aws_api_gateway_method_response.audio_to_ai_response,
-    aws_api_gateway_method_response.is_connect_response,
-    # Add CORS integration dependencies
-    aws_api_gateway_integration_response.pattern_to_ai_options_integration_response,
-    aws_api_gateway_integration_response.audio_to_ai_options_integration_response,
-    aws_api_gateway_integration_response.is_connect_options_integration_response
-  ]
-  
-  rest_api_id = aws_api_gateway_rest_api.rest_api.id
-  
-  # Just use sha256 of all integration paths to trigger redeployment
-  triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_integration.pattern_to_ai_api_int.uri,
-      aws_api_gateway_integration.audio_to_ai_api_int.uri,
-      aws_api_gateway_integration.is_connect_api_int.uri,
-      aws_api_gateway_integration_response.pattern_to_ai_options_integration_response.id,
-      aws_api_gateway_integration_response.audio_to_ai_options_integration_response.id,
-      aws_api_gateway_integration_response.is_connect_options_integration_response.id
-    ]))
-  }
-  
+    depends_on = [
+      aws_api_gateway_integration.pattern_to_ai_api_int,
+      aws_api_gateway_integration.audio_to_ai_api_int,
+      aws_api_gateway_integration.is_connect_api_int
+    ]
+    rest_api_id = aws_api_gateway_rest_api.rest_api.id
+    triggers = {
+      # Improved trigger that uses all relevant resources
+      redeployment = sha1(jsonencode([
+        aws_api_gateway_resource.pattern_to_ai.id,
+        aws_api_gateway_resource.audio_to_ai.id,
+        aws_api_gateway_resource.is_connect.id,
+        aws_api_gateway_method.pattern_to_ai_http_method.id,
+        aws_api_gateway_method.audio_to_ai_http_method.id,
+        aws_api_gateway_method.is_connect_http_method.id,
+        aws_api_gateway_integration.pattern_to_ai_api_int.id,
+        aws_api_gateway_integration.audio_to_ai_api_int.id,
+        aws_api_gateway_integration.is_connect_api_int.id
+      ]))
+    }
   lifecycle {
     create_before_destroy = true
   }

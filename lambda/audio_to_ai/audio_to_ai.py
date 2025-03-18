@@ -278,6 +278,32 @@ def lambda_handler(event, context):
             if key in params:
                 event[key] = params[key]
 
+    # Extract the payload from the API Gateway event
+    # Check if the event includes a 'body' field (API Gateway integration)
+    if 'body' in event:
+        try:
+            # If body is a JSON string, parse it
+            if isinstance(event['body'], str):
+                body = json.loads(event['body'])
+            else:
+                body = event['body']
+            # Update event with the body content for parameter extraction
+            event.update(body)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse event body as JSON")
+            return {
+                'statusCode': 400,
+                'body': json.dumps("Invalid request body format")
+            }
+
+    # Handle API Gateway proxy integration where parameters might be in various places
+    if 'requestContext' in event and 'pathParameters' in event and event['pathParameters']:
+        # Extract parameters from the path if available
+        params = event['pathParameters']
+        for key in ['uuid', 'pin', 'file']:
+            if key in params:
+                event[key] = params[key]
+
     # Validate required parameters
     required_params = {'uuid', 'pin', 'file'}
     if not isinstance(event, dict):
@@ -393,7 +419,7 @@ def lambda_handler(event, context):
         'statusCode': 200,
         'headers': {
             'Content-Type': "application/json",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": "*", 
             "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
             "Access-Control-Allow-Headers": "Content-Type"
         },

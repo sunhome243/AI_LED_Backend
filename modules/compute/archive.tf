@@ -20,30 +20,14 @@ locals {
   
   # Add isConnect files to file detection
   isConnect_files = [
-    for file in fileset("${local.base_dir}/lambda/websocket", "**") : 
-    "${local.base_dir}/lambda/websocket/${file}" if file == "isConnect.py"
+    "${local.base_dir}/lambda/websocket/isConnect.py"
   ]
   
   # Calculate hash of source files to detect changes more reliably
-  # Use sha256 of concatenated files instead of filemd5 of the archive
   audio_to_ai_source_hash = sha256(join("", [for f in local.audio_to_ai_files : filesha256(f)]))
   pattern_to_ai_source_hash = sha256(join("", [for f in local.pattern_to_ai_files : filesha256(f)]))
   result_save_send_source_hash = sha256(join("", [for f in local.result_save_send_files : filesha256(f)]))
-  
-  # Calculate hash for isConnect
   isConnect_source_hash = sha256(join("", [for f in local.isConnect_files : filesha256(f)]))
-}
-
-# Add the missing null_resource for ensuring archive directory exists
-resource "null_resource" "ensure_archive_dir" {
-  # Execute this always to ensure directory exists
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-
-  provisioner "local-exec" {
-    command = "mkdir -p ${path.module}/archive"
-  }
 }
 
 # Ensure archive directory exists

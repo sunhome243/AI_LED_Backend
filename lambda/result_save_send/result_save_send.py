@@ -89,14 +89,22 @@ def get_ir_code_from_table(device_type, ir_id):
     """
     table = dynamodb.Table("IrCodeTable")
     try:
+        # Ensure ir_id is int for DynamoDB consistency
+        ir_id_int = int(ir_id)
+
         response = table.get_item(
             Key={
                 'deviceType': device_type,
-                'id': ir_id
+                'id': ir_id_int
             }
         )
         if 'Item' in response and 'ir_code' in response['Item']:
             return response['Item']['ir_code']
+        else:
+            logger.warning(
+                f"IR code not found for device_type: {device_type}, ir_id: {ir_id_int}")
+    except ValueError:
+        logger.error(f"Invalid IR ID format: {ir_id}, expected an integer")
     except Exception as e:
         logger.error(f"Failed to retrieve item from DynamoDB: {str(e)}")
     return None
@@ -342,7 +350,8 @@ async def main(event, context):
     """
     # Extract identifiers from the event
     uuid = event.get("uuid")
-    request_id = event.get("requestId")
+    request_id = event.get("request_id") or event.get(
+        "requestId")  # Check both formats
 
     if not uuid or not request_id:
         logger.error("Missing required fields: uuid or requestId")
@@ -427,25 +436,47 @@ def lambda_handler(event, context):
         event (dict): The event dict from Lambda trigger containing:
                         - uuid: Unique identifier for the user/device
                         - requestId: Unique identifier for this request
-                        - lightSetting: Light configuration parameters. Contains:
-                            - color: RGB color values
-                            - power: Power state (on/off)
-                            - dynamicMode: Dynamic mode setting
-                        - emotion: Map of detected emotions from the AI. Contains:
-                            - main: Main emotion detected
-                            - subcategories: List of subcategories
+                        - lightSetting: Light configuration parameters
+                        - emotion: Map of detected emotions from the AI
                         - recommendation: Textual explanation of the lighting choice
                         - context: Additional contextual information
         context (object): Lambda context object
 
     Returns:
         dict: API Gateway compatible response with statusCode and body
-
-    Environment Variables:
-        REGION_NAME: AWS region (default: 'us-east-1')
-        BUCKET_NAME: S3 bucket for storing responses
-        WEBSOCKET_URL: API Gateway WebSocket endpoint URL
     """
+    # Process the event if it's coming from API Gateway
+    if 'body' in event:
+        try:
+            # If body is a JSON string, parse it
+            if isinstance(event['body'], str):
+                body = json.loads(event['body'])
+            else:
+                body = event['body']
+            # Update event with the body content
+            event = body
+        except json.JSONDecodeError:
+            logger.error("Failed to parse event body as JSON")
+            return {
+                'statusCode': 400,
+                'body': json.dumps("Invalid request body format")
+            }
+
     # Create an event loop
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(main(event, context))
+    result = loop.run_until_complete(main(event, context))
+
+    # Return a formatted response for API Gateway
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Content-Type': "application/json",
+        },
+        'body': json.dumps({
+            "message": "Processing complete",
+            "uuid": event.get("uuid", "unknown"),
+            "request_id": event.get("request_id") or event.get("requestId", "unknown")
+        })
+    }
+    
+    
