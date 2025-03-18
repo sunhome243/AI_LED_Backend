@@ -29,10 +29,20 @@ def lambda_handler(event, context):
         }
 
     try:
-        uuid = event.get('uuid')
+        # Log the incoming event for debugging
+        logger.info(f"Received event: {json.dumps(event)}")
+
+        # Extract UUID only from the request body
+        uuid = None
+        if 'body' in event and event['body'] is not None:
+            body = json.loads(event['body'])
+            uuid = body.get('uuid')
+
         if not uuid:
             raise ValueError("UUID is required")
+
     except Exception as e:
+        logger.error(f"Error extracting UUID: {str(e)}")
         return {
             'statusCode': 400,
             'headers': headers,
@@ -66,6 +76,7 @@ def lambda_handler(event, context):
                 })
             }
     except Exception as e:
+        logger.error(f"Error checking connection: {str(e)}")
         return {
             'statusCode': 500,
             'headers': headers,
