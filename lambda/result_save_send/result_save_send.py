@@ -306,13 +306,19 @@ async def send_data_to_arduino(connection_id, response):
 
     try:
         # Fix WebSocket URL format for the API Gateway client
-        # Remove wss:// prefix if present
+        # Extract the domain part without the stage
         if websocket_url.startswith('wss://'):
-            endpoint_url = 'https://' + websocket_url[6:]
-        elif not websocket_url.startswith('https://'):
-            endpoint_url = 'https://' + websocket_url
+            # Remove wss:// and any path including stage
+            domain = websocket_url[6:].split('/', 1)[0]
+            endpoint_url = f'https://{domain}/develop'
+        elif websocket_url.startswith('https://'):
+            # Remove https:// and any path including stage
+            domain = websocket_url[8:].split('/', 1)[0]
+            endpoint_url = f'https://{domain}/develop'
         else:
-            endpoint_url = websocket_url
+            # Just extract the domain without any path/stage
+            domain = websocket_url.split('/', 1)[0]
+            endpoint_url = f'https://{domain}/develop'
 
         logger.info(f"Using endpoint URL: {endpoint_url}")
         apigateway_client = boto_session.client(
@@ -478,5 +484,3 @@ def lambda_handler(event, context):
             "request_id": event.get("request_id") or event.get("requestId", "unknown")
         })
     }
-    
-    

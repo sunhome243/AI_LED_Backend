@@ -4,8 +4,7 @@ output "websocket_api_endpoint" {
 }
 
 output "websocket_stage_name" {
-  # Update to use the correct resource name for the API Gateway stage
-  value = "production"  # Using a hardcoded value as fallback
+  value = aws_apigatewayv2_stage.ws_messenger_api_stage.name
   description = "The WebSocket API Gateway stage name"
 }
 

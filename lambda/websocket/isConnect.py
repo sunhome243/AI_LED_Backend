@@ -12,6 +12,22 @@ logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event, context):
+    # Add CORS headers to all responses
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Credentials': True
+    }
+
+    # Handle OPTIONS method for CORS preflight requests
+    if event.get('httpMethod') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': headers,
+            'body': json.dumps({'message': 'CORS preflight successful'})
+        }
+
     try:
         uuid = event.get('uuid')
         if not uuid:
@@ -19,6 +35,7 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             'statusCode': 400,
+            'headers': headers,
             'body': json.dumps({
                 'error': 'wrong input',
                 'message': str(e)
@@ -33,6 +50,7 @@ def lambda_handler(event, context):
         if 'Item' in response and 'connectionId' in response['Item']:
             return {
                 'statusCode': 200,
+                'headers': headers,
                 'body': json.dumps({
                     'connected': True,
                     'message': 'Arduino is connected'
@@ -41,6 +59,7 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 200,
+                'headers': headers,
                 'body': json.dumps({
                     'connected': False,
                     'message': 'Arduino is not connected'
@@ -49,6 +68,7 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             'statusCode': 500,
+            'headers': headers,
             'body': json.dumps({
                 'error': 'failed to check connection status',
                 'message': str(e)
