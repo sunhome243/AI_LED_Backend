@@ -479,6 +479,7 @@ resource "aws_api_gateway_gateway_response" "default_4xx" {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
+    "gatewayresponse.header.Access-Control-Expose-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
   }
 }
 
@@ -490,6 +491,7 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
+    "gatewayresponse.header.Access-Control-Expose-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
   }
 }
 

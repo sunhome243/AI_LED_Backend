@@ -37,6 +37,14 @@ lambda_client = boto_session.client('lambda')
 # Generate unique request ID for tracing
 request_id = shortuuid.uuid()
 
+# CORS headers to include in all responses
+CORS_HEADERS = {
+    'Content-Type': "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+}
+
 # Gemini API initialization
 google_gemini_api_key = os.environ.get('GOOGLE_GEMINI_API_KEY')
 if not google_gemini_api_key:
@@ -288,6 +296,7 @@ def lambda_handler(event, context):
             f"Missing required environment variables: {', '.join(missing_vars)}")
         return {
             'statusCode': 500,
+            'headers': CORS_HEADERS,
             'body': json.dumps(f"Missing required environment variables: {', '.join(missing_vars)}")
         }
 
@@ -306,6 +315,7 @@ def lambda_handler(event, context):
             logger.error("Failed to parse event body as JSON")
             return {
                 'statusCode': 400,
+                'headers': CORS_HEADERS,
                 'body': json.dumps("Invalid request body format")
             }
 
@@ -325,6 +335,7 @@ def lambda_handler(event, context):
         logger.error("Event is not a dictionary")
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid event format")
         }
 
@@ -334,6 +345,7 @@ def lambda_handler(event, context):
             f"Missing required parameters: {', '.join(missing_params)}")
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps(f"Missing required parameters: {', '.join(missing_params)}")
         }
 
@@ -345,12 +357,14 @@ def lambda_handler(event, context):
     if not uuid or not isinstance(uuid, str):
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid UUID format")
         }
 
     if not pin or not isinstance(pin, str):
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid PIN format")
         }
 
@@ -360,6 +374,7 @@ def lambda_handler(event, context):
     except AuthenticationError as e:
         return {
             'statusCode': 401,
+            'headers': CORS_HEADERS,
             'body': json.dumps(str(e))
         }
 
@@ -397,6 +412,7 @@ def lambda_handler(event, context):
     if not parsed_json:
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("AI failed to create an appropriate response")
         }
 
@@ -429,12 +445,7 @@ def lambda_handler(event, context):
     logger.info(f"Successfully processed request for UUID: {uuid}")
     return {
         'statusCode': 200,
-        'headers': {
-            'Content-Type': "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
-            "Access-Control-Allow-Headers": "Content-Type"
-        },
+        'headers': CORS_HEADERS,
         'body': json.dumps({
             "recommendation": parsed_json["recommendation"],
             "request_id": request_id,

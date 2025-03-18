@@ -45,6 +45,15 @@ if not google_gemini_api_key:
 client = genai.Client(api_key=google_gemini_api_key)
 
 
+# CORS headers to include in all responses
+CORS_HEADERS = {
+    'Content-Type': "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+}
+
+
 def auth_user(uuid, pin):
     """
     Authenticate user by comparing the provided pin with the stored pin in DynamoDB.
@@ -130,17 +139,22 @@ def get_genai_response(file):
         # Upload the audio file to Gemini API
         uploaded_file = client.files.upload(file)
 
-        # Get the default configuration for audio processing
-        generate_content_config = get_gemini_config()
+        # Create contents with user role including the audio file
+        contents = [
+            {"role": "user", "parts": [
+                {"text": "Analyze this audio and recommend lighting settings"}, uploaded_file]}
+        ]
 
-        # Send audio to Gemini model with system instruction
+        # Get configuration
+        config = {
+            'response_mime_type': 'application/json',
+        }
+
+        # Call the API with the correct format
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[
-                'follow the system instruction',
-                uploaded_file,
-            ],
-            generation_config=generate_content_config,
+            model='gemini-2.0-flash',
+            contents=contents,
+            config=config
         )
 
         return response
@@ -250,10 +264,13 @@ def lambda_handler(event, context):
             f"Missing required environment variables: {', '.join(missing_vars)}")
         return {
             'statusCode': 500,
+            'headers': CORS_HEADERS,
             'body': json.dumps(f"Missing required environment variables: {', '.join(missing_vars)}")
         }
 
-    # Extract the payload from the API Gateway event
+    # Extract the payload from the API Gateway event - FIXED DUPLICATED CODE
+    logger.info(f"Received event: {json.dumps(event)}")
+
     # Check if the event includes a 'body' field (API Gateway integration)
     if 'body' in event:
         try:
@@ -264,10 +281,12 @@ def lambda_handler(event, context):
                 body = event['body']
             # Update event with the body content for parameter extraction
             event.update(body)
-        except json.JSONDecodeError:
-            logger.error("Failed to parse event body as JSON")
+            logger.info(f"Parsed body: {json.dumps(body)}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse event body as JSON: {str(e)}")
             return {
                 'statusCode': 400,
+                'headers': CORS_HEADERS,
                 'body': json.dumps("Invalid request body format")
             }
 
@@ -278,32 +297,8 @@ def lambda_handler(event, context):
         for key in ['uuid', 'pin', 'file']:
             if key in params:
                 event[key] = params[key]
-
-    # Extract the payload from the API Gateway event
-    # Check if the event includes a 'body' field (API Gateway integration)
-    if 'body' in event:
-        try:
-            # If body is a JSON string, parse it
-            if isinstance(event['body'], str):
-                body = json.loads(event['body'])
-            else:
-                body = event['body']
-            # Update event with the body content for parameter extraction
-            event.update(body)
-        except json.JSONDecodeError:
-            logger.error("Failed to parse event body as JSON")
-            return {
-                'statusCode': 400,
-                'body': json.dumps("Invalid request body format")
-            }
-
-    # Handle API Gateway proxy integration where parameters might be in various places
-    if 'requestContext' in event and 'pathParameters' in event and event['pathParameters']:
-        # Extract parameters from the path if available
-        params = event['pathParameters']
-        for key in ['uuid', 'pin', 'file']:
-            if key in params:
-                event[key] = params[key]
+                logger.info(
+                    f"Found {key} in pathParameters: {params[key][:10]}...")
 
     # Validate required parameters
     required_params = {'uuid', 'pin', 'file'}
@@ -311,6 +306,7 @@ def lambda_handler(event, context):
         logger.error("Event is not a dictionary")
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid event format")
         }
 
@@ -320,6 +316,7 @@ def lambda_handler(event, context):
             f"Missing required parameters: {', '.join(missing_params)}")
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps(f"Missing required parameters: {', '.join(missing_params)}")
         }
 
@@ -331,22 +328,28 @@ def lambda_handler(event, context):
     if not uuid or not isinstance(uuid, str):
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid UUID format")
         }
 
     if not pin or not isinstance(pin, str):
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid PIN format")
         }
 
     # Decode base64 file content
     try:
+        logger.info(
+            f"Attempting to decode base64 file of length: {len(event['file'])}")
         file = base64.b64decode(event['file'])
+        logger.info(f"Successfully decoded file, binary length: {len(file)}")
     except Exception as e:
         logger.error(f"Failed to decode base64 file: {str(e)}")
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("Invalid file encoding")
         }
 
@@ -356,12 +359,7 @@ def lambda_handler(event, context):
     except AuthenticationError as e:
         return {
             'statusCode': 401,
-            'headers': {
-                'Content-Type': "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
-                "Access-Control-Allow-Headers": "Content-Type"
-            },
+            'headers': CORS_HEADERS,
             'body': json.dumps(str(e))
         }
 
@@ -373,6 +371,7 @@ def lambda_handler(event, context):
         logger.error(f"Failed to store audio file: {str(e)}")
         return {
             'statusCode': 500,
+            'headers': CORS_HEADERS,
             'body': json.dumps(f"Failed to store audio file: {str(e)}")
         }
 
@@ -405,6 +404,7 @@ def lambda_handler(event, context):
     if not parsed_json:
         return {
             'statusCode': 400,
+            'headers': CORS_HEADERS,
             'body': json.dumps("AI failed to create an appropriate response")
         }
 
@@ -414,24 +414,28 @@ def lambda_handler(event, context):
     parsed_json["timestamp"] = datetime.now().isoformat()
 
     # Invoke result-save-send Lambda to process the recommendation asynchronously
-    lambda_client.invoke(
-        FunctionName=os.environ.get('RESULT_LAMBDA_NAME'),
-        InvocationType='Event',  # for async invocation
-        Payload=json.dumps(parsed_json)
-    )
+    try:
+        result_lambda_name = os.environ.get(
+            'RESULT_LAMBDA_NAME', 'result-save-send')
+        logger.info(f"Invoking Lambda function: {result_lambda_name}")
+        lambda_client.invoke(
+            FunctionName=result_lambda_name,
+            InvocationType='Event',  # for async invocation
+            Payload=json.dumps(parsed_json)
+        )
+        logger.info(f"Successfully invoked {result_lambda_name} Lambda")
+    except Exception as e:
+        logger.error(f"Failed to invoke result Lambda: {str(e)}")
+        # Continue execution to at least return recommendation to user
 
     # Return success response with recommendation text
     logger.info(f"Successfully processed request for UUID: {uuid}")
     return {
         'statusCode': 200,
-        'headers': {
-            'Content-Type': "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
-            "Access-Control-Allow-Headers": "Content-Type"
-        },
+        'headers': CORS_HEADERS,
         'body': json.dumps({
             "recommendation": parsed_json["recommendation"],
-            "request_id": request_id
+            "request_id": request_id,
+            "complete_data": parsed_json  # Include full data in case Lambda invocation failed
         })
     }
