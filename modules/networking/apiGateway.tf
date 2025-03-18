@@ -76,7 +76,7 @@ resource "aws_api_gateway_integration" "pattern_to_ai_api_int" {
   rest_api_id             = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = var.pattern_to_ai_lambda_arn
+  uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/${var.pattern_to_ai_lambda_arn}/invocations"
   content_handling        = "CONVERT_TO_TEXT"
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
@@ -87,7 +87,7 @@ resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
   rest_api_id             = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = var.audio_to_ai_lambda_arn
+  uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/${var.audio_to_ai_lambda_arn}/invocations"
   content_handling        = "CONVERT_TO_TEXT"
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
@@ -98,7 +98,7 @@ resource "aws_api_gateway_integration" "is_connect_api_int" {
   rest_api_id             = aws_api_gateway_rest_api.rest_api.id
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = var.isConnect_lambda_arn
+  uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/${var.isConnect_lambda_arn}/invocations"
   content_handling        = "CONVERT_TO_TEXT"
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
@@ -294,6 +294,10 @@ resource "aws_api_gateway_method_response" "audio_to_ai_response" {
   response_models = {
     "application/json" = "Empty"
   }
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
 
   lifecycle {
     create_before_destroy = true
@@ -314,10 +318,94 @@ resource "aws_api_gateway_method_response" "is_connect_response" {
   response_models = {
     "application/json" = "Empty"
   }
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
 
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Add integration responses for POST methods to set CORS headers
+resource "aws_api_gateway_integration_response" "pattern_to_ai_integration_response" {
+  depends_on = [
+    aws_api_gateway_integration.pattern_to_ai_api_int,
+    aws_api_gateway_method_response.pattern_to_ai_response
+  ]
+  
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  resource_id = aws_api_gateway_resource.pattern_to_ai_gateway_resource.id
+  http_method = aws_api_gateway_method.pattern_to_ai_http_method.http_method
+  status_code = aws_api_gateway_method_response.pattern_to_ai_response.status_code
+  
+  # For Lambda proxy integration, the actual response is managed by Lambda
+  # but we can add headers
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "audio_to_ai_integration_response" {
+  depends_on = [
+    aws_api_gateway_integration.audio_to_ai_api_int,
+    aws_api_gateway_method_response.audio_to_ai_response
+  ]
+  
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  resource_id = aws_api_gateway_resource.audio_to_ai_gateway_resource.id
+  http_method = aws_api_gateway_method.audio_to_ai_http_method.http_method
+  status_code = aws_api_gateway_method_response.audio_to_ai_response.status_code
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "is_connect_integration_response" {
+  depends_on = [
+    aws_api_gateway_integration.is_connect_api_int,
+    aws_api_gateway_method_response.is_connect_response
+  ]
+  
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  resource_id = aws_api_gateway_resource.is_connect.id
+  http_method = aws_api_gateway_method.is_connect_http_method.http_method
+  status_code = aws_api_gateway_method_response.is_connect_response.status_code
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+}
+
+// Add Lambda permissions for API Gateway to invoke each Lambda function
+resource "aws_lambda_permission" "pattern_to_ai_lambda_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.pattern_to_ai_function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # The source ARN restricts which API Gateway endpoints can invoke the Lambda
+  source_arn = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.pattern_to_ai_http_method.http_method}${aws_api_gateway_resource.pattern_to_ai_gateway_resource.path}"
+}
+
+resource "aws_lambda_permission" "audio_to_ai_lambda_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.audio_to_ai_function_name
+  principal     = "apigateway.amazonaws.com"
+  
+  source_arn = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.audio_to_ai_http_method.http_method}${aws_api_gateway_resource.audio_to_ai_gateway_resource.path}"
+}
+
+resource "aws_lambda_permission" "is_connect_lambda_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.isConnect_function_name
+  principal     = "apigateway.amazonaws.com"
+  
+  source_arn = "${aws_api_gateway_rest_api.rest_api.execution_arn}/*/${aws_api_gateway_method.is_connect_http_method.http_method}${aws_api_gateway_resource.is_connect.path}"
 }
 
 # API Gateway Deployment with improved dependency handling and timeouts
@@ -325,7 +413,14 @@ resource "aws_api_gateway_deployment" "deploy" {
     depends_on = [
       aws_api_gateway_integration.pattern_to_ai_api_int,
       aws_api_gateway_integration.audio_to_ai_api_int,
-      aws_api_gateway_integration.is_connect_api_int
+      aws_api_gateway_integration.is_connect_api_int,
+      aws_api_gateway_integration_response.pattern_to_ai_integration_response,
+      aws_api_gateway_integration_response.audio_to_ai_integration_response,
+      aws_api_gateway_integration_response.is_connect_integration_response,
+      aws_api_gateway_gateway_response.default_4xx,
+      aws_api_gateway_gateway_response.default_5xx,
+      aws_api_gateway_gateway_response.unauthorized,
+      aws_api_gateway_gateway_response.access_denied
     ]
     rest_api_id = aws_api_gateway_rest_api.rest_api.id
     triggers = {
@@ -372,6 +467,53 @@ resource "aws_api_gateway_method_settings" "api_settings" {
     data_trace_enabled = true
     metrics_enabled    = true
     logging_level      = "INFO"
+  }
+}
+
+# Add Gateway Response configuration to handle CORS for error responses
+resource "aws_api_gateway_gateway_response" "default_4xx" {
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+  response_type = "DEFAULT_4XX"
+  
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_5xx" {
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+  response_type = "DEFAULT_5XX"
+  
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
+  }
+}
+
+# Update Gateway Response for Unauthorized errors specifically
+resource "aws_api_gateway_gateway_response" "unauthorized" {
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+  response_type = "UNAUTHORIZED"
+  
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
+  }
+}
+
+# Add ACCESS_DENIED response configuration
+resource "aws_api_gateway_gateway_response" "access_denied" {
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+  response_type = "ACCESS_DENIED"
+  
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'OPTIONS,POST,GET'"
   }
 }
 

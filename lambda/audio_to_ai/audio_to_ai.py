@@ -62,14 +62,15 @@ def auth_user(uuid, pin):
     table = dynamodb.Table("AuthTable")
 
     try:
-        response = table.get_item(Key={'uuid': uuid})
-        stored_pin = response.get("Item", {}).get("pin")
+        # Query using both the hash key (uuid) and range key (pin)
+        response = table.get_item(Key={'uuid': uuid, 'pin': pin})
 
-        if not stored_pin or stored_pin != pin:
-            logger.warning(f"Invalid PIN provided for UUID: {uuid}")
-            raise AuthenticationError("Invalid pin")
-
-        return True
+        # If the item exists, authentication is successful
+        if 'Item' in response:
+            return True
+        else:
+            logger.warning(f"Invalid UUID/PIN combination for UUID: {uuid}")
+            raise AuthenticationError("Invalid UUID/PIN combination")
 
     except Exception as e:
         logger.error(f"Failed to authenticate user: {str(e)}")
@@ -355,6 +356,12 @@ def lambda_handler(event, context):
     except AuthenticationError as e:
         return {
             'statusCode': 401,
+            'headers': {
+                'Content-Type': "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
+                "Access-Control-Allow-Headers": "Content-Type"
+            },
             'body': json.dumps(str(e))
         }
 
@@ -419,7 +426,7 @@ def lambda_handler(event, context):
         'statusCode': 200,
         'headers': {
             'Content-Type': "application/json",
-            "Access-Control-Allow-Origin": "*", 
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "OPTIONS, POST, GET",
             "Access-Control-Allow-Headers": "Content-Type"
         },

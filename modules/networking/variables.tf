@@ -34,3 +34,22 @@ variable "isConnect_lambda_arn" {
   type        = string
   description = "ARN of the isConnect Lambda function (from compute module)"
 }
+
+# Add AWS region data source
+data "aws_region" "current" {}
+
+# Add new variables for function names
+variable "pattern_to_ai_function_name" {
+  type        = string
+  description = "Name of the pattern_to_ai Lambda function"
+}
+
+variable "audio_to_ai_function_name" {
+  type        = string
+  description = "Name of the audio_to_ai Lambda function"
+}
+
+variable "isConnect_function_name" {
+  type        = string
+  description = "Name of the isConnect Lambda function"
+}

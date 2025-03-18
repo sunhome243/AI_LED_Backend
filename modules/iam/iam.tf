@@ -116,7 +116,8 @@ resource "aws_iam_policy" "lambda_invoke_policy" {
     Statement = [
       {
         Action = [
-          "lambda:InvokeFunction"
+          "lambda:InvokeFunction",
+          "lambda:GetFunction"
         ]
         Effect   = "Allow"
         Resource = "*"  # You can restrict this to specific Lambda ARNs for better security

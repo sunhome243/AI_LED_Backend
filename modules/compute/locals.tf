@@ -10,7 +10,7 @@ locals {
     pattern_to_ai   = "pattern-to-ai"
     result_save_send = "result-save-send"
     ws_messenger    = "ws-messenger"
-    isConnect       = "is-connect"  # Added isConnect function
+    isConnect       = "is-connect"
   }
 
   # Lambda function configurations
@@ -40,7 +40,6 @@ locals {
         GOOGLE_GEMINI_API_KEY = var.GOOGLE_GEMINI_API_KEY
         BUCKET_NAME           = var.response_bucket_name
         REGION_NAME           = var.REGION_NAME
-        # Format WebSocket URL correctly without wss:// prefix
         WEBSOCKET_URL         = replace(
           "${var.websocket_endpoint}/${var.websocket_stage_name}",
           "wss://", 
@@ -63,4 +62,7 @@ locals {
       }
     }
   }
+
+  # Add conditional logic for managing CloudWatch Log Groups
+  manage_log_groups = false
 }
