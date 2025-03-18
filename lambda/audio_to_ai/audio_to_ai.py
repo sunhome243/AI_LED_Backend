@@ -120,10 +120,9 @@ def get_genai_response(file):
     Generate a response using the Gemini AI model based on the uploaded audio file.
 
     This function:
-    1. Uploads the audio file to Gemini AI
+    1. Reads the audio file as binary data
     2. Configures and sends a prompt to process the audio content
     3. Returns the AI-generated response for lighting configuration
-    4. Cleans up the uploaded file after processing
 
     Args:
         file (str): Path to the audio file to be uploaded for processing.
@@ -134,15 +133,46 @@ def get_genai_response(file):
     Raises:
         AIProcessingError: If Gemini AI processing fails
     """
-    uploaded_file = None
     try:
-        # Upload the audio file to Gemini API
-        uploaded_file = client.files.upload(file)
+        # Read the audio file directly instead of uploading
+        with open(file, 'rb') as f:
+            audio_data = f.read()
 
-        # Create contents with user role including the audio file
+        # Create instruction text similar to pattern_to_ai
+        instruction_text = """Adaptive Personalized Lighting Assistant
+
+You are an AI that analyzes audio to determine context, emotion, and activity to make personalized lighting recommendations.
+Based on the audio content, recommend appropriate lighting that enhances the detected mood, context or activity.
+The AI must select either RGB color or Dynamic mode—never both.
+
+Output Schema must be valid JSON with the following structure:
+{
+  "context": "Brief description of the context detected in audio",
+  "emotion": {
+    "main": "Primary emotion detected",
+    "subcategories": ["emotion1", "emotion2", "emotion3"]
+  },
+  "lightSetting": {
+    "power": true,
+    "color": [255, 255, 255]
+  },
+  "recommendation": "Friendly message explaining the lighting choice based on audio"
+}"""
+
+        # Create comprehensive prompt combining instruction and audio file
+        combined_prompt = f"{instruction_text}\n\nUser Request: Analyze this audio and recommend optimal lighting settings."
+
+        # Create contents with user role including the audio file reference using inline_data
         contents = [
             {"role": "user", "parts": [
-                {"text": "Analyze this audio and recommend lighting settings"}, uploaded_file]}
+                {"text": combined_prompt},
+                {
+                    "inline_data": {
+                        "mime_type": "audio/wav",
+                        "data": base64.b64encode(audio_data).decode('utf-8')
+                    }
+                }
+            ]}
         ]
 
         # Get configuration
@@ -161,13 +191,6 @@ def get_genai_response(file):
     except Exception as e:
         logger.error(f"Error in Gemini AI processing: {str(e)}")
         raise AIProcessingError(f"Gemini AI processing failed: {str(e)}")
-    finally:
-        # Clean up the uploaded file regardless of success or failure
-        if uploaded_file:
-            try:
-                client.files.delete(name=uploaded_file.name)
-            except Exception as e:
-                logger.warning(f"Failed to delete uploaded file: {str(e)}")
 
 
 def verify_and_parse_json(response):
