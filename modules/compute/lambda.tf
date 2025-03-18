@@ -17,6 +17,8 @@ locals {
       timeout          = local.default_timeout
       environment      = merge(local.lambda_functions.audio_to_ai.environment, {
         PYTHONPATH = "/opt/python/lib/python3.9/site-packages:/var/task"
+        # Add layer version to force redeployment when layer changes
+        LAMBDA_LAYER_VERSION = var.lambda_layer_version
       })
     },
     "pattern_to_ai" = {
@@ -70,18 +72,12 @@ resource "aws_lambda_function" "functions" {
   publish          = true
   layers           = [var.lambda_layer_arn]
 
-  # 기존 Lambda 함수를 수정할 수 있도록 lifecycle 규칙 개선
+  # Proper lifecycle configuration that allows Lambda updates
   lifecycle {
     create_before_destroy = true
-    # Ignore changes more comprehensively to handle existing functions
     ignore_changes = [
       tags,
-      publish,
-      # Only apply source_code_hash during first creation
-      source_code_hash, 
-      # When function already exists, maintain its existing settings
-      memory_size,
-      timeout
+      # Do NOT ignore publish or source_code_hash to allow proper updates
     ]
   }
 
@@ -89,10 +85,20 @@ resource "aws_lambda_function" "functions" {
     variables = each.value.environment
   }
   
-  # 속도 제한을 피하기 위해 sleep 명령어 추가
-  provisioner "local-exec" {
-    command = "sleep 1"
+  # Force redeployment by adding explicit layer dependency
+  depends_on = [
+    null_resource.check_archive_sizes,
+    null_resource.force_lambda_update  # New dependency
+  ]
+}
+
+# Create a resource to force Lambda redeployment when layer changes
+resource "null_resource" "force_lambda_update" {
+  # This trigger will change whenever the Lambda layer changes
+  triggers = {
+    layer_version = var.lambda_layer_version
+    layer_arn = var.lambda_layer_arn
+    # Added timestamp to force redeployment on apply
+    deployment_time = timestamp()
   }
-  
-  depends_on = [null_resource.check_archive_sizes]
 }

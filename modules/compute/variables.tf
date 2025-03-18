@@ -23,6 +23,12 @@ variable "lambda_layer_arn" {
   description = "ARN of the Lambda layer containing common dependencies"
 }
 
+variable "lambda_layer_version" {
+  type        = string
+  description = "Version number of the Lambda layer to force redeployment"
+  default     = "1"
+}
+
 # DynamoDB table variables
 variable "connection_table_name" {
   type        = string

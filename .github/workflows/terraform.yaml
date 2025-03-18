@@ -31,6 +31,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Set up Python for Lambda layer building
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      # Install pip dependencies for layer building
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install build tools
+          pip install wheel setuptools
+          # Install packages with explicit version constraints
+          pip install "shortuuid==1.0.13" "google-genai==1.5.0" "httpx>=0.28.1,<1.0.0" "google-auth==2.28.0"
+
+      # Prepare Lambda layer building script
+      - name: Prepare Lambda layer build script
+        run: |
+          chmod +x build_layer.sh
+          ./build_layer.sh
+
       # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1

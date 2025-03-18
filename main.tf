@@ -45,7 +45,7 @@ module "iam" {
 # Create WebSocket module after database and IAM
 module "websocket" {
   source                = "./modules/websocket"
-  depends_on            = [module.iam, module.database, aws_lambda_layer_version.lambda_dependencies]
+  depends_on            = [module.iam, module.database, null_resource.build_lambda_layer]
   lambda_role_arn       = module.iam.lambda_role_arn
   connection_table_name = module.database.connection_table_name
   api_gateway_role_arn  = module.iam.api_gateway_role_arn
@@ -55,7 +55,7 @@ module "websocket" {
 # Now create compute module after WebSocket is created
 module "compute" {
   source     = "./modules/compute"
-  depends_on = [module.iam, module.database, module.websocket, aws_lambda_layer_version.lambda_dependencies]
+  depends_on = [module.iam, module.database, module.websocket, null_resource.build_lambda_layer]
 
   # Pass required resources to compute module
   google_gemini_api_key = var.GOOGLE_GEMINI_API_KEY  # Add this line for the new variable name
@@ -68,6 +68,7 @@ module "compute" {
   websocket_stage_name  = module.websocket.websocket_stage_name
   connection_table_name = module.database.connection_table_name
   lambda_layer_arn      = aws_lambda_layer_version.lambda_dependencies.arn
+  lambda_layer_version  = aws_lambda_layer_version.lambda_dependencies.version
 }
 
 module "networking" {

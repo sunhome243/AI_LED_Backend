@@ -46,4 +46,4 @@ lambda_layer.zip
 
 modules/compute/archive/*
 modules/websocket/archive/*
-tmp_build
+layer_build/

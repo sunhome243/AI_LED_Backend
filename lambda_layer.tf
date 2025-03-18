@@ -11,16 +11,8 @@ resource "aws_lambda_layer_version" "lambda_dependencies" {
   
   description = "Lambda layer containing common Python dependencies"
   
-  # Make sure the layer depends on the rebuild process
-  depends_on = [null_resource.build_lambda_layer]
-
-  # Add simpler cleanup process
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Lambda layer created successfully"
-      rm -rf "${path.module}/tmp_build" || true
-    EOT
-  }
+  # Remove count parameter to ensure the resource is always created
+  # This makes it work more reliably in CI/CD environments
 }
 
 # Initialize an empty zip file to prevent "file not found" errors
@@ -41,82 +33,49 @@ resource "null_resource" "init_layer_zip" {
   }
 }
 
-# Optimize the layer building process for Lambda architecture
+# Lambda layer build process that works in both local and CI/CD environments
 resource "null_resource" "build_lambda_layer" {
-  # Build only when requirements change or when explicitly triggered
   triggers = {
+    # Rebuild when requirements change or force build with trigger
     requirements_hash = fileexists("${path.module}/requirements.txt") ? filebase64sha256("${path.module}/requirements.txt") : "default"
-    # Weekly rebuild trigger - change this number to force rebuilds
-    rebuild_trigger = "4"
+    rebuild_trigger = "13"  # Increment to force rebuild
   }
   
   provisioner "local-exec" {
     command = <<-EOT
-      echo "Building Lambda layer from requirements.txt specifically for Lambda x86_64 architecture..."
+      echo "===== BUILDING LAMBDA LAYER FOR CI/CD ====="
       
-      # Ensure the requirements.txt file exists
-      if [ ! -f "${path.module}/requirements.txt" ]; then
-        echo "WARNING: requirements.txt not found. Creating empty file."
-        touch "${path.module}/requirements.txt"
-      fi
+      # Make build script executable (important for CI/CD)
+      chmod +x ${path.module}/build_layer.sh
       
-      BUILD_DIR="${path.module}/tmp_build"
-      echo "Using build directory: $BUILD_DIR"
-      mkdir -p "$BUILD_DIR/python/lib/python3.9/site-packages"
-      
-      echo "Installing dependencies with manylinux2014_x86_64 compatibility..."
-      pip3 install \
-        --platform manylinux2014_x86_64 \
-        --implementation cp \
-        --python-version 3.9 \
-        --only-binary=:all: \
-        --target="$BUILD_DIR/python/lib/python3.9/site-packages" \
-        --no-cache-dir \
-        --upgrade \
-        -r "${path.module}/requirements.txt"
-        
-      # Fall back to standard installation if the platform-specific one fails
-      if [ $? -ne 0 ]; then
-        echo "WARNING: Platform-specific installation failed, falling back to standard installation"
-        echo "This might cause compatibility issues with Lambda runtime"
-        
-        # Clean target directory before retry
-        rm -rf "$BUILD_DIR/python/lib/python3.9/site-packages/"*
-        
-        # Standard pip install as fallback
-        pip3 install \
-          --target="$BUILD_DIR/python/lib/python3.9/site-packages" \
-          --no-cache-dir \
-          --upgrade \
-          -r "${path.module}/requirements.txt"
-      fi
-      
-      # Create a layer verification marker
-      echo "Creating layer verification marker..."
-      mkdir -p "$BUILD_DIR/python/lib/python3.9/site-packages/layer_verification"
-      cat > "$BUILD_DIR/python/lib/python3.9/site-packages/layer_verification/__init__.py" << 'EOF'
-def verify_layer():
-    print("Lambda layer verification successful")
-    return True
-EOF
-      
-      echo "Creating Lambda layer zip..."
-      cd "$BUILD_DIR" && zip -r "${path.module}/lambda_layer.zip" python
-      
-      # Verify zip file was created successfully
-      if [ -f "${path.module}/lambda_layer.zip" ]; then
-        echo "Lambda layer built successfully for Lambda architecture"
-        ls -lh "${path.module}/lambda_layer.zip"
-      else
-        echo "ERROR: Failed to create lambda_layer.zip"
-        # Create minimal zip to prevent Terraform failure
-        echo "Creating minimal zip as fallback"
-        mkdir -p "$BUILD_DIR/python/lib/python3.9/site-packages/fallback"
-        echo "# Fallback layer" > "$BUILD_DIR/python/lib/python3.9/site-packages/fallback/__init__.py"
-        cd "$BUILD_DIR" && zip -r "${path.module}/lambda_layer.zip" python
-      fi
+      # Run the optimized build script
+      ${path.module}/build_layer.sh
     EOT
   }
   
   depends_on = [null_resource.init_layer_zip]
+}
+
+# Validation that's more CI/CD friendly
+resource "null_resource" "validate_lambda_layer" {
+  triggers = {
+    # Run validation after build
+    build_completed = null_resource.build_lambda_layer.id
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "===== VALIDATING LAMBDA LAYER ====="
+      
+      if [ ! -f "${path.module}/lambda_layer.zip" ]; then
+        echo "ERROR: lambda_layer.zip not found! Build failed."
+        exit 1
+      fi
+      
+      echo "Layer size: $(du -h "${path.module}/lambda_layer.zip" | cut -f1)"
+      
+      # Simple check for critical packages - exit code 0 for CI/CD
+      unzip -l "${path.module}/lambda_layer.zip" | grep -i -E 'shortuuid|google|httpx' || echo "WARNING: Some packages might be missing"
+    EOT
+  }
 }
