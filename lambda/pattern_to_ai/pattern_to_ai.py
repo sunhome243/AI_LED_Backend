@@ -331,6 +331,9 @@ Current Time: Monday, 14:30
             ],
             response_mime_type="application/json",
             response_schema=response_schema,
+            system_instruction=[
+                genai.types.Part.from_text(text=instruction_text)
+            ],
         )
 
         # Create contents with user prompt and system instruction
@@ -338,16 +341,11 @@ Current Time: Monday, 14:30
             {"role": "user", "parts": [{"text": user_prompt}]}
         ]
 
-        system_instruction = [
-            genai.types.Part.from_text(text=instruction_text)
-        ]
-
         # Call the API with the correct format
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
-            config=generate_content_config,
-            system_instruction=system_instruction
+            config=generate_content_config
         )
 
         return response

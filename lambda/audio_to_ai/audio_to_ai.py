@@ -145,89 +145,6 @@ def get_genai_response(file):
             ),
         ]
 
-        # Get configuration
-        config = genai.types.GenerateContentConfig(
-            temperature=0.65,
-            top_p=0.95,
-            top_k=40,
-            max_output_tokens=8192,
-            safety_settings=[
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HARASSMENT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HATE_SPEECH",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-            ],
-            response_mime_type="application/json",
-            response_schema=genai.types.Schema(
-                type=genai.types.Type.OBJECT,
-                required=["lightSetting", "emotion",
-                          "recommendation", "context"],
-                properties={
-                    "lightSetting": genai.types.Schema(
-                        type=genai.types.Type.OBJECT,
-                        required=["power"],
-                        properties={
-                            "color": genai.types.Schema(
-                                type=genai.types.Type.ARRAY,
-                                items=genai.types.Schema(
-                                    type=genai.types.Type.STRING,
-                                ),
-                            ),
-                            "power": genai.types.Schema(
-                                type=genai.types.Type.BOOLEAN,
-                            ),
-                            "dynamic": genai.types.Schema(
-                                type=genai.types.Type.STRING,
-                                enum=["AUTO", "SLOW", "QUICK", "FLASH", "FADE7", "FADE3",
-                                      "JUMP7", "JUMP3", "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"],
-                            ),
-                        },
-                    ),
-                    "emotion": genai.types.Schema(
-                        type=genai.types.Type.OBJECT,
-                        description="Emotion analysis result",
-                        required=["main", "subcategories"],
-                        properties={
-                            "main": genai.types.Schema(
-                                type=genai.types.Type.STRING,
-                                enum=["Positive", "Negative", "Neutral"],
-                            ),
-                            "subcategories": genai.types.Schema(
-                                type=genai.types.Type.ARRAY,
-                                items=genai.types.Schema(
-                                    type=genai.types.Type.STRING,
-                                    enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed", "Satisfied", "Peaceful", "Relieved", "Surprised (Good)", "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed", "Sad", "Lonely", "Regretful", "Frustrated",
-                                          "Annoyed", "Angry", "Hurt", "Anxious", "Scared", "Worried", "Doubtful", "Helpless", "Disgusted", "Uncomfortable", "Shocked (Bad)", "Conflicted", "Indifferent", "Practical", "Logical", "Clear-headed", "Balanced", "Neutral"],
-                                ),
-                            ),
-                        },
-                    ),
-                    "recommendation": genai.types.Schema(
-                        type=genai.types.Type.STRING,
-                    ),
-                    "context": genai.types.Schema(
-                        type=genai.types.Type.STRING,
-                    ),
-                },
-            ),
-        )
-
         # System instruction for proper context
         system_instruction = """# Personalized Lighting Assistant
 
@@ -331,12 +248,97 @@ Theme-Based Color Selection
 Fallback Protocol
 - Use time-appropriate defaults when context is unclear."""
 
+        # Get configuration
+        config = genai.types.GenerateContentConfig(
+            temperature=0.65,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            safety_settings=[
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+            ],
+            response_mime_type="application/json",
+            response_schema=genai.types.Schema(
+                type=genai.types.Type.OBJECT,
+                required=["lightSetting", "emotion",
+                          "recommendation", "context"],
+                properties={
+                    "lightSetting": genai.types.Schema(
+                        type=genai.types.Type.OBJECT,
+                        required=["power"],
+                        properties={
+                            "color": genai.types.Schema(
+                                type=genai.types.Type.ARRAY,
+                                items=genai.types.Schema(
+                                    type=genai.types.Type.STRING,
+                                ),
+                            ),
+                            "power": genai.types.Schema(
+                                type=genai.types.Type.BOOLEAN,
+                            ),
+                            "dynamic": genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["AUTO", "SLOW", "QUICK", "FLASH", "FADE7", "FADE3",
+                                      "JUMP7", "JUMP3", "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"],
+                            ),
+                        },
+                    ),
+                    "emotion": genai.types.Schema(
+                        type=genai.types.Type.OBJECT,
+                        description="Emotion analysis result",
+                        required=["main", "subcategories"],
+                        properties={
+                            "main": genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["Positive", "Negative", "Neutral"],
+                            ),
+                            "subcategories": genai.types.Schema(
+                                type=genai.types.Type.ARRAY,
+                                items=genai.types.Schema(
+                                    type=genai.types.Type.STRING,
+                                    enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed", "Satisfied", "Peaceful", "Relieved", "Surprised (Good)", "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed", "Sad", "Lonely", "Regretful", "Frustrated",
+                                          "Annoyed", "Angry", "Hurt", "Anxious", "Scared", "Worried", "Doubtful", "Helpless", "Disgusted", "Uncomfortable", "Shocked (Bad)", "Conflicted", "Indifferent", "Practical", "Logical", "Clear-headed", "Balanced", "Neutral"],
+                                ),
+                            ),
+                        },
+                    ),
+                    "recommendation": genai.types.Schema(
+                        type=genai.types.Type.STRING,
+                    ),
+                    "context": genai.types.Schema(
+                        type=genai.types.Type.STRING,
+                    ),
+                },
+            ),
+            system_instruction=[
+                genai.types.Part.from_text(text=system_instruction)
+            ],
+        )
+
         # Call the Gemini API with the correct format
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
             generation_config=config,
-            system_instruction=system_instruction
         )
 
         return response
