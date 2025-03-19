@@ -162,26 +162,26 @@ Core Functions
 
 Output Schema
 
-1️⃣ User Activity (activity)
+User Activity (activity)
 	•	main: General category (e.g., "study", "reading", "movie").
 	•	sub: Specific details ("math", "comic book", "horror movie").
 
-2️⃣ Light Settings (lightSetting)
+Light Settings (lightSetting)
 	•	Choose ONE of the following:
 	•	RGB Color: [R, G, B] based on prior preferences and environmental factors.
 	•	Dynamic Mode: "FADE3", "MUSIC2", etc. (Only if the activity requires it, e.g., music, party, gaming.)
 	•	Brightness Scaling: Adjust brightness based on time, activity, and previous feedback.
 	•	Power: true (on) or false (off).
 
-3️⃣ Emotional Analysis (emotion)
+Emotional Analysis (emotion)
 	•	main: "Positive", "Negative", "Neutral"
 	•	sub: Top 3 detected emotions.
 
-4️⃣ Recommendation (recommendation)
+Recommendation (recommendation)
 	•	Explain why this lighting choice was made.
 	•	Example: "Since you usually study between 12 PM - 3 PM on Mondays, bright white light is set for focus. Stay productive! ✨"
 
-5️⃣ Context (context)
+Context (context)
 	•	Concise description (e.g., "Monday afternoon study session, feeling focused.").
 
 Guidelines
@@ -242,6 +242,19 @@ Current Time: Monday, 14:30
             user_prompt = "Generate a lighting recommendation for a new user."
         else:
             user_prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation."
+
+        # Combine the instruction and user prompt
+        combined_prompt = f"{instruction_text}\n\nUser Request: {user_prompt}"
+
+        # Create contents with just the combined text
+        contents = [
+            genai.types.Content(
+                role="user",
+                parts=[
+                    genai.types.Part.from_text(text=combined_prompt),
+                ],
+            ),
+        ]
 
         # Set up response schema
         response_schema = genai.types.Schema(
@@ -307,46 +320,43 @@ Current Time: Monday, 14:30
             top_p=0.95,
             top_k=40,
             max_output_tokens=8192,
-            safety_settings=[
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HARASSMENT",
-                    threshold="BLOCK_NONE",
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HATE_SPEECH",
-                    threshold="BLOCK_NONE",
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold="BLOCK_NONE",
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_NONE",
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
-                    threshold="BLOCK_NONE",
-                ),
-            ],
             response_mime_type="application/json",
             response_schema=response_schema,
-            system_instruction=[
-                genai.types.Part.from_text(text=instruction_text)
-            ],
         )
 
-        # Create contents with user prompt and system instruction
-        contents = [
-            {"role": "user", "parts": [{"text": user_prompt}]}
+        # Add safety settings separately
+        safety_settings = [
+            genai.types.SafetySetting(
+                category="HARM_CATEGORY_HARASSMENT",
+                threshold="BLOCK_NONE",
+            ),
+            genai.types.SafetySetting(
+                category="HARM_CATEGORY_HATE_SPEECH",
+                threshold="BLOCK_NONE",
+            ),
+            genai.types.SafetySetting(
+                category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold="BLOCK_NONE",
+            ),
+            genai.types.SafetySetting(
+                category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold="BLOCK_NONE",
+            ),
+            genai.types.SafetySetting(
+                category="HARM_CATEGORY_CIVIC_INTEGRITY",
+                threshold="BLOCK_NONE",
+            ),
         ]
 
-        # Call the API with the correct format
+        # Call the API with the correct format based on sample code
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
-            config=generate_content_config
+            config=generate_content_config,
         )
+
+        # Log the Gemini AI response
+        logger.info(f"Gemini AI response: {response.text}")
 
         return response
 
@@ -365,6 +375,8 @@ def verify_and_parse_json(response):
     Returns:
         Parsed JSON if valid, None otherwise
     """
+    logger.info(f"Verifying response from Gemini AI: {response.text}")
+
     try:
         # Extract JSON from Gemini response
         json_response = json.loads(response.text)
@@ -383,7 +395,8 @@ def verify_and_parse_json(response):
 
     # Extract lighting parameters
     color = light_setting.get("color")
-    dynamic_mode = light_setting.get("dynamicMode")
+    # Check both 'dynamic' and 'dynamicMode' fields
+    dynamic_mode = light_setting.get("dynamic")
     power = light_setting.get("power")
 
     # Validate light configuration based on power state and mode
@@ -392,7 +405,7 @@ def verify_and_parse_json(response):
             pass
         else:
             logger.error(
-                "Failed. Error in light mode: neither color nor dynamicMode specified when power is on")
+                "Failed. Error in light mode: neither color nor dynamic mode specified when power is on")
             return None
     else:
         # Validate dynamic mode option if color is not specified
@@ -401,10 +414,29 @@ def verify_and_parse_json(response):
                 logger.error(f"Failed. Error in dynamic mode: {dynamic_mode}")
                 return None
         # Validate RGB color format if dynamic mode is not specified
-        if dynamic_mode is None:
-            if not isinstance(color, list) or len(color) != 3 or not all(isinstance(code, int) and 0 <= code < 256 for code in color):
-                logger.error(f"Failed. Error in color code: {color}")
+        if dynamic_mode is None and color is not None:
+            # Check if color is a list of strings or integers
+            if not isinstance(color, list) or len(color) != 3:
+                logger.error(f"Failed. Error in color code format: {color}")
                 return None
+
+            # Convert strings to integers if needed
+            try:
+                color_values = [int(c) if isinstance(
+                    c, str) else c for c in color]
+                if not all(isinstance(code, int) and 0 <= code < 256 for code in color_values):
+                    logger.error(
+                        f"Failed. Error in color code values: {color}")
+                    return None
+                # Update color with integer values
+                light_setting["color"] = color_values
+            except ValueError:
+                logger.error(f"Failed. Error converting color values: {color}")
+                return None
+
+    # Standardize dynamic field name to 'dynamic' if it exists as 'dynamicMode'
+    if light_setting.get("dynamicMode") and not light_setting.get("dynamic"):
+        light_setting["dynamic"] = light_setting.pop("dynamicMode")
 
     return json_response
 

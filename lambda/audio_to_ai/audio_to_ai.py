@@ -106,6 +106,7 @@ def store_wav_file(uuid, file):
         # Write binary data to file
         with open(wav_file, "wb") as f:
             f.write(file)
+        logger.info(f"Successfully stored audio file at: {wav_file}")
         return wav_file
     except Exception as e:
         logger.error(f"Failed to write audio file: {str(e)}")
@@ -126,26 +127,14 @@ def get_genai_response(file):
         AIProcessingError: If AI processing fails
     """
     try:
-        # Read the audio file directly instead of uploading
+        # Read the audio file directly
         with open(file, 'rb') as f:
             audio_data = f.read()
 
-        # Create comprehensive prompt for user query
-        combined_prompt = "User Request: Analyze this audio and recommend optimal lighting settings."
+        # Create prompt for user query
+        prompt_text = "Analyze this audio and recommend optimal lighting settings."
 
-        # Create contents with user role including the audio file reference using inline_data
-        contents = [
-            genai.types.Content(
-                role="user",
-                parts=[
-                    genai.types.Part.from_text(text=combined_prompt),
-                    genai.types.Part.from_file(
-                        data=audio_data, mime_type="audio/wav"),
-                ],
-            ),
-        ]
-
-        # System instruction for proper context
+        # Create system instruction for proper context
         system_instruction = """# Personalized Lighting Assistant
 
 You are an AI that analyzes audio input to create personalized lighting recommendations based on emotional state, context, and time of day.
@@ -248,97 +237,86 @@ Theme-Based Color Selection
 Fallback Protocol
 - Use time-appropriate defaults when context is unclear."""
 
-        # Get configuration
-        config = genai.types.GenerateContentConfig(
+        # Create combined text and audio content
+        contents = [
+            genai.types.Content(
+                role="user",
+                parts=[
+                    genai.types.Part.from_text(text=prompt_text),
+                    genai.types.Part.from_bytes(
+                        data=audio_data, mime_type="audio/wav"),
+                ],
+            ),
+        ]
+
+        # Set up response schema
+        response_schema = genai.types.Schema(
+            type=genai.types.Type.OBJECT,
+            required=["lightSetting", "emotion", "recommendation", "context"],
+            properties={
+                "lightSetting": genai.types.Schema(
+                    type=genai.types.Type.OBJECT,
+                    required=["power"],
+                    properties={
+                        "color": genai.types.Schema(
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                            ),
+                        ),
+                        "power": genai.types.Schema(
+                            type=genai.types.Type.BOOLEAN,
+                        ),
+                        "dynamic": genai.types.Schema(
+                            type=genai.types.Type.STRING,
+                            enum=VALID_DYNAMIC_MODES,
+                        ),
+                    },
+                ),
+                "emotion": genai.types.Schema(
+                    type=genai.types.Type.OBJECT,
+                    description="Emotion analysis result",
+                    required=["main", "subcategories"],
+                    properties={
+                        "main": genai.types.Schema(
+                            type=genai.types.Type.STRING,
+                            enum=["Positive", "Negative", "Neutral"],
+                        ),
+                        "subcategories": genai.types.Schema(
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed", "Satisfied", "Peaceful", "Relieved", "Surprised (Good)", "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed", "Sad", "Lonely", "Regretful", "Frustrated",
+                                      "Annoyed", "Angry", "Hurt", "Anxious", "Scared", "Worried", "Doubtful", "Helpless", "Disgusted", "Uncomfortable", "Shocked (Bad)", "Conflicted", "Indifferent", "Practical", "Logical", "Clear-headed", "Balanced", "Neutral"],
+                            ),
+                        ),
+                    },
+                ),
+                "recommendation": genai.types.Schema(
+                    type=genai.types.Type.STRING,
+                ),
+                "context": genai.types.Schema(
+                    type=genai.types.Type.STRING,
+                ),
+            },
+        )
+
+        # Create the generation config
+        generate_content_config = genai.types.GenerateContentConfig(
             temperature=0.65,
             top_p=0.95,
             top_k=40,
             max_output_tokens=8192,
-            safety_settings=[
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HARASSMENT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_HATE_SPEECH",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-                genai.types.SafetySetting(
-                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
-                    threshold="BLOCK_NONE",  # Block none
-                ),
-            ],
             response_mime_type="application/json",
-            response_schema=genai.types.Schema(
-                type=genai.types.Type.OBJECT,
-                required=["lightSetting", "emotion",
-                          "recommendation", "context"],
-                properties={
-                    "lightSetting": genai.types.Schema(
-                        type=genai.types.Type.OBJECT,
-                        required=["power"],
-                        properties={
-                            "color": genai.types.Schema(
-                                type=genai.types.Type.ARRAY,
-                                items=genai.types.Schema(
-                                    type=genai.types.Type.STRING,
-                                ),
-                            ),
-                            "power": genai.types.Schema(
-                                type=genai.types.Type.BOOLEAN,
-                            ),
-                            "dynamic": genai.types.Schema(
-                                type=genai.types.Type.STRING,
-                                enum=["AUTO", "SLOW", "QUICK", "FLASH", "FADE7", "FADE3",
-                                      "JUMP7", "JUMP3", "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"],
-                            ),
-                        },
-                    ),
-                    "emotion": genai.types.Schema(
-                        type=genai.types.Type.OBJECT,
-                        description="Emotion analysis result",
-                        required=["main", "subcategories"],
-                        properties={
-                            "main": genai.types.Schema(
-                                type=genai.types.Type.STRING,
-                                enum=["Positive", "Negative", "Neutral"],
-                            ),
-                            "subcategories": genai.types.Schema(
-                                type=genai.types.Type.ARRAY,
-                                items=genai.types.Schema(
-                                    type=genai.types.Type.STRING,
-                                    enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed", "Satisfied", "Peaceful", "Relieved", "Surprised (Good)", "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed", "Sad", "Lonely", "Regretful", "Frustrated",
-                                          "Annoyed", "Angry", "Hurt", "Anxious", "Scared", "Worried", "Doubtful", "Helpless", "Disgusted", "Uncomfortable", "Shocked (Bad)", "Conflicted", "Indifferent", "Practical", "Logical", "Clear-headed", "Balanced", "Neutral"],
-                                ),
-                            ),
-                        },
-                    ),
-                    "recommendation": genai.types.Schema(
-                        type=genai.types.Type.STRING,
-                    ),
-                    "context": genai.types.Schema(
-                        type=genai.types.Type.STRING,
-                    ),
-                },
-            ),
-            system_instruction=[
-                genai.types.Part.from_text(text=system_instruction)
-            ],
+            response_schema=response_schema,
+            system_instruction=system_instruction,
         )
 
-        # Call the Gemini API with the correct format
+        # Call the Gemini API with the same format as pattern_to_ai.py
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
-            generation_config=config,
+            config=generate_content_config,
         )
 
         return response
@@ -515,6 +493,20 @@ def lambda_handler(event, context):
             'headers': CORS_HEADERS,
             'body': json.dumps("Invalid PIN format")
         }
+
+    # Extract file format info if provided, default to WAV
+    audio_mime_type = event.get('mimeType', 'audio/wav')
+    supported_mime_types = [
+        'audio/wav', 'audio/mp3', 'audio/aiff',
+        'audio/aac', 'audio/ogg', 'audio/flac'
+    ]
+
+    if audio_mime_type not in supported_mime_types:
+        logger.warning(
+            f"Unsupported audio MIME type: {audio_mime_type}, defaulting to audio/wav")
+        audio_mime_type = 'audio/wav'
+    else:
+        logger.info(f"Processing audio with MIME type: {audio_mime_type}")
 
     # Decode base64 file content
     try:
