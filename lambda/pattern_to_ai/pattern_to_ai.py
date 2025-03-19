@@ -154,10 +154,10 @@ def get_past_reponse(uuid, timestamp=None):
     table = dynamodb.Table('ResponseTable')
 
     try:
-        # Query DynamoDB with the correct sort key format
+        # Query DynamoDB with the correct sort key attribute name (not 'sort_key')
         response = table.query(
             KeyConditionExpression=Key('uuid').eq(uuid_key) &
-            Key('sort_key').between(start_sort_key, end_sort_key),
+            Key('TIME#DAY').between(start_sort_key, end_sort_key),
             ScanIndexForward=False,  # Get most recent first
             Limit=20  # Limit to 20 most recent responses
         )
