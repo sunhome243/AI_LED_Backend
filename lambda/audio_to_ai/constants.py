@@ -20,8 +20,8 @@ DYNAMIC_MODES = {
 
 # Valid dynamic modes for validation
 VALID_DYNAMIC_MODES = [
-    "FLASH", "STROBE", "FADE", "SMOOTH",
-    "JUMP3", "JUMP7", "FADE3", "FADE7",
+    "AUTO", "SLOW", "QUICK", "FLASH",
+    "FADE7", "FADE3", "JUMP7", "JUMP3",
     "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"
 ]
 

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from boto3.session import Session
 from boto3.dynamodb.conditions import Key
 from google import genai
+from google.genai import types
 from get_gemini_config_surprise_me import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
 
@@ -242,24 +243,111 @@ Current Time: Monday, 14:30
         else:
             user_prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation."
 
-        # Combine the instruction and user prompt
-        combined_prompt = f"{instruction_text}\n\nUser Request: {user_prompt}"
+        # Set up response schema
+        response_schema = genai.types.Schema(
+            type=genai.types.Type.OBJECT,
+            required=["lightSetting", "emotion", "recommendation", "context"],
+            properties={
+                "lightSetting": genai.types.Schema(
+                    type=genai.types.Type.OBJECT,
+                    required=["power"],
+                    properties={
+                        "color": genai.types.Schema(
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                            ),
+                        ),
+                        "power": genai.types.Schema(
+                            type=genai.types.Type.BOOLEAN,
+                        ),
+                        "dynamic": genai.types.Schema(
+                            type=genai.types.Type.STRING,
+                            enum=VALID_DYNAMIC_MODES,
+                        ),
+                    },
+                ),
+                "emotion": genai.types.Schema(
+                    type=genai.types.Type.OBJECT,
+                    description="Emotion analysis result",
+                    required=["main", "subcategories"],
+                    properties={
+                        "main": genai.types.Schema(
+                            type=genai.types.Type.STRING,
+                            enum=["Positive", "Negative", "Neutral"],
+                        ),
+                        "subcategories": genai.types.Schema(
+                            type=genai.types.Type.ARRAY,
+                            items=genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed",
+                                      "Satisfied", "Peaceful", "Relieved", "Surprised (Good)",
+                                      "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed",
+                                      "Sad", "Lonely", "Regretful", "Frustrated", "Annoyed",
+                                      "Angry", "Hurt", "Anxious", "Scared", "Worried",
+                                      "Doubtful", "Helpless", "Disgusted", "Uncomfortable",
+                                      "Shocked (Bad)", "Conflicted", "Indifferent", "Practical",
+                                      "Logical", "Clear-headed", "Balanced", "Neutral"],
+                            ),
+                        ),
+                    },
+                ),
+                "recommendation": genai.types.Schema(
+                    type=genai.types.Type.STRING,
+                ),
+                "context": genai.types.Schema(
+                    type=genai.types.Type.STRING,
+                ),
+            },
+        )
 
-        # Create contents with only a user role since system role is not supported
+        # Create a configuration with all necessary parameters
+        generate_content_config = genai.types.GenerateContentConfig(
+            temperature=0.85,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            safety_settings=[
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
+                    threshold="BLOCK_NONE",
+                ),
+            ],
+            response_mime_type="application/json",
+            response_schema=response_schema,
+        )
+
+        # Create contents with user prompt and system instruction
         contents = [
-            {"role": "user", "parts": [{"text": combined_prompt}]}
+            {"role": "user", "parts": [{"text": user_prompt}]}
         ]
 
-        # Create config dictionary as shown in the official docs
-        config = {
-            'response_mime_type': 'application/json',
-        }
+        system_instruction = [
+            genai.types.Part.from_text(text=instruction_text)
+        ]
 
         # Call the API with the correct format
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
-            config=config
+            config=generate_content_config,
+            system_instruction=system_instruction
         )
 
         return response

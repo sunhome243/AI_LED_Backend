@@ -130,8 +130,106 @@ def get_genai_response(file):
         with open(file, 'rb') as f:
             audio_data = f.read()
 
-        # Create instruction text similar to pattern_to_ai
-        instruction_text = """# Personalized Lighting Assistant
+        # Create comprehensive prompt for user query
+        combined_prompt = "User Request: Analyze this audio and recommend optimal lighting settings."
+
+        # Create contents with user role including the audio file reference using inline_data
+        contents = [
+            genai.types.Content(
+                role="user",
+                parts=[
+                    genai.types.Part.from_text(text=combined_prompt),
+                    genai.types.Part.from_file(
+                        data=audio_data, mime_type="audio/wav"),
+                ],
+            ),
+        ]
+
+        # Get configuration
+        config = genai.types.GenerateContentConfig(
+            temperature=0.65,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            safety_settings=[
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+                genai.types.SafetySetting(
+                    category="HARM_CATEGORY_CIVIC_INTEGRITY",
+                    threshold="BLOCK_NONE",  # Block none
+                ),
+            ],
+            response_mime_type="application/json",
+            response_schema=genai.types.Schema(
+                type=genai.types.Type.OBJECT,
+                required=["lightSetting", "emotion",
+                          "recommendation", "context"],
+                properties={
+                    "lightSetting": genai.types.Schema(
+                        type=genai.types.Type.OBJECT,
+                        required=["power"],
+                        properties={
+                            "color": genai.types.Schema(
+                                type=genai.types.Type.ARRAY,
+                                items=genai.types.Schema(
+                                    type=genai.types.Type.STRING,
+                                ),
+                            ),
+                            "power": genai.types.Schema(
+                                type=genai.types.Type.BOOLEAN,
+                            ),
+                            "dynamic": genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["AUTO", "SLOW", "QUICK", "FLASH", "FADE7", "FADE3",
+                                      "JUMP7", "JUMP3", "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"],
+                            ),
+                        },
+                    ),
+                    "emotion": genai.types.Schema(
+                        type=genai.types.Type.OBJECT,
+                        description="Emotion analysis result",
+                        required=["main", "subcategories"],
+                        properties={
+                            "main": genai.types.Schema(
+                                type=genai.types.Type.STRING,
+                                enum=["Positive", "Negative", "Neutral"],
+                            ),
+                            "subcategories": genai.types.Schema(
+                                type=genai.types.Type.ARRAY,
+                                items=genai.types.Schema(
+                                    type=genai.types.Type.STRING,
+                                    enum=["Happy", "Excited", "Thankful", "Proud", "Relaxed", "Satisfied", "Peaceful", "Relieved", "Surprised (Good)", "Energetic", "Motivated", "Loved", "Hopeful", "Disappointed", "Sad", "Lonely", "Regretful", "Frustrated",
+                                          "Annoyed", "Angry", "Hurt", "Anxious", "Scared", "Worried", "Doubtful", "Helpless", "Disgusted", "Uncomfortable", "Shocked (Bad)", "Conflicted", "Indifferent", "Practical", "Logical", "Clear-headed", "Balanced", "Neutral"],
+                                ),
+                            ),
+                        },
+                    ),
+                    "recommendation": genai.types.Schema(
+                        type=genai.types.Type.STRING,
+                    ),
+                    "context": genai.types.Schema(
+                        type=genai.types.Type.STRING,
+                    ),
+                },
+            ),
+        )
+
+        # System instruction for proper context
+        system_instruction = """# Personalized Lighting Assistant
 
 You are an AI that analyzes audio input to create personalized lighting recommendations based on emotional state, context, and time of day.
 
@@ -144,23 +242,23 @@ Output Schema (ALL fields REQUIRED)
 1. Keyword Object (`keyword`)
 - Purpose: Used for personalization by categorizing the user's activity.
 - Structure:
-  - `mainKeyword`: General activity category (e.g., `"game"`, `"study"`, `"movie"`, `"exercise"`, `"relax"`, `"music"`).
+  - `mainKeyword`: General activity category (e.g., `\"game\"`, `\"study\"`, `\"movie\"`, `\"exercise\"`, `\"relax\"`, `\"music\"`).
   - `subKeyword`: More detailed and specific keyword related to the main activity.
     - Examples:
-      - For Gaming: `{ "mainKeyword": "game", "subKeyword": "overwatch" }`
-      - For Movie Watching: `{ "mainKeyword": "movie", "subKeyword": "horror" }`
-      - For Studying: `{ "mainKeyword": "study", "subKeyword": "math" }`
-    - If no specific `subKeyword` is detected, it should be set to `"general"`.
+      - For Gaming: `{ \"mainKeyword\": \"game\", \"subKeyword\": \"overwatch\" }`
+      - For Movie Watching: `{ \"mainKeyword\": \"movie\", \"subKeyword\": \"horror\" }`
+      - For Studying: `{ \"mainKeyword\": \"study\", \"subKeyword\": \"math\" }`
+    - If no specific `subKeyword` is detected, it should be set to `\"general\"`.
 
 2. Light Settings (`lightSetting`)
 - Choose ONLY ONE option between `Color` and `Dynamic mode`:
-  - Color: RGB values as a string array (e.g., `["255", "0", "0"]`).
+  - Color: RGB values as a string array (e.g., `[\"255\", \"0\", \"0\"]`).
     - Brightness Scaling (MUST BE UNDERSTOOD)
       - `[0,0,0]` = Off (Darkest setting)
       - `[255,255,255]` = Fully bright (Maximum brightness)
       - AI must adjust brightness based on the environment and user context.
-        - Dark Environment (e.g., `"dark room"`, `"watching a movie"`) → Lower brightness
-        - Bright Environment (e.g., `"studying"`, `"working"`) → Higher brightness
+        - Dark Environment (e.g., `\"dark room\"`, `\"watching a movie\"`) → Lower brightness
+        - Bright Environment (e.g., `\"studying\"`, `\"working\"`) → Higher brightness
       - LED Strip Application:  
         - These RGB values are used to control LED strip lighting.
         - The AI must correctly adjust the lighting to provide an optimal experience.
@@ -184,8 +282,8 @@ Output Schema (ALL fields REQUIRED)
 
     - DO NOT use dynamic mode unless it is truly necessary.
     - Only apply dynamic effects for:
-      - Parties / Celebrations (e.g., `"party"`, `"birthday"`, `"celebration"`)
-      - High-energy activities (e.g., `"dancing"`, `"working out"`, `"rave"`)
+      - Parties / Celebrations (e.g., `\"party\"`, `\"birthday\"`, `\"celebration\"`)
+      - High-energy activities (e.g., `\"dancing\"`, `\"working out\"`, `\"rave\"`)
       - Music synchronization (explicit request or strong music-related context)
 
 - Power: Boolean (`true`=on, `false`=off).
@@ -210,56 +308,35 @@ Brightness Adjustment (MUST BE FOLLOWED)
     - Evening/Nighttime → Warmer, softer lights (e.g., `[180, 100, 50]`)
   - User Activity:
     For example,
-    - `"watching a movie"` → Dim lighting (e.g., `[50, 0, 0]` for horror, `[80, 50, 50]` for romance)
-    - `"playing a game"` → Adapt to game theme (e.g., `"overwatch"` → Orange/Blue theme)
-    - `"studying"` → Bright white light (e.g., `[255, 255, 255]`)
+    - `\"watching a movie\"` → Dim lighting (e.g., `[50, 0, 0]` for horror, `[80, 50, 50]` for romance)
+    - `\"playing a game\"` → Adapt to game theme (e.g., `\"overwatch\"` → Orange/Blue theme)
+    - `\"studying\"` → Bright white light (e.g., `[255, 255, 255]`)
   - Implicit Dark Environment Prediction:
     - If no explicit mention of brightness is given, infer the likely environment:
       - Low Brightness (Dark Environment Expected):
-        - `"watching a movie"`, `"playing a horror game"`, `"relaxing"`, `"listening to calm music"`, `"meditating"`, `"chilling"`, `"sleeping"`, `"having a romantic dinner"`
+        - `\"watching a movie\"`, `\"playing a horror game\"`, `\"relaxing\"`, `\"listening to calm music\"`, `\"meditating\"`, `\"chilling\"`, `\"sleeping\"`, `\"having a romantic dinner\"`
       - High Brightness (Bright Environment Expected):
-        - `"studying"`, `"exercising"`, `"cooking"`, `"working on a project"`, `"reading a book"`, `"cleaning"`, `"getting ready for the day"`
+        - `\"studying\"`, `\"exercising\"`, `\"cooking\"`, `\"working on a project\"`, `\"reading a book\"`, `\"cleaning\"`, `\"getting ready for the day\"`
 
 Theme-Based Color Selection
 - If the user's activity has a single, clear theme color → Apply them:
-  - `"Deadpool"` →  red-ish
-  - `"Ocean"` →  blue-ish
-  - `"Sunset"` → warm orange -ish
+  - `\"Deadpool\"` →  red-ish
+  - `\"Ocean\"` →  blue-ish
+  - `\"Sunset\"` → warm orange -ish
 - If the theme has multiple conflicting colors or is unclear → Use general analysis instead:
-  - `"Christmas"` (Red & Green) → General analysis
-  - `"Halloween"` (Orange, Black, Purple) → General analysis
-  - `"Festival"` (Unclear colors) → General analysis
+  - `\"Christmas\"` (Red & Green) → General analysis
+  - `\"Halloween\"` (Orange, Black, Purple) → General analysis
+  - `\"Festival\"` (Unclear colors) → General analysis
 
 Fallback Protocol
-- Use time-appropriate defaults when context is unclear.
-}"""
+- Use time-appropriate defaults when context is unclear."""
 
-        # Create comprehensive prompt combining instruction and audio file
-        combined_prompt = f"{instruction_text}\n\nUser Request: Analyze this audio and recommend optimal lighting settings."
-
-        # Create contents with user role including the audio file reference using inline_data
-        contents = [
-            {"role": "user", "parts": [
-                {"text": combined_prompt},
-                {
-                    "inline_data": {
-                        "mime_type": "audio/wav",
-                        "data": base64.b64encode(audio_data).decode('utf-8')
-                    }
-                }
-            ]}
-        ]
-
-        # Get configuration
-        config = {
-            'response_mime_type': 'application/json',
-        }
-
-        # Call the API with the correct format
+        # Call the Gemini API with the correct format
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
-            config=config
+            generation_config=config,
+            system_instruction=system_instruction
         )
 
         return response
@@ -294,9 +371,10 @@ def verify_and_parse_json(response):
 
     light_setting = json_response["lightSetting"]
 
-    # Extract lighting parameters
+    # Extract lighting parameters - note the field name change from dynamicMode to dynamic
     color = light_setting.get("color")
-    dynamic_mode = light_setting.get("dynamicMode")
+    # Changed from dynamicMode to dynamic
+    dynamic_mode = light_setting.get("dynamic")
     power = light_setting.get("power")
 
     # Validate light configuration based on power state and mode
@@ -305,7 +383,7 @@ def verify_and_parse_json(response):
             pass
         else:
             logger.error(
-                "Failed. Error in light mode: neither color nor dynamicMode specified when power is on")
+                "Failed. Error in light mode: neither color nor dynamic specified when power is on")
             return None
     else:
         # Validate dynamic mode option if color is not specified
@@ -315,8 +393,25 @@ def verify_and_parse_json(response):
                 return None
         # Validate RGB color format if dynamic mode is not specified
         if dynamic_mode is None:
-            if not isinstance(color, list) or len(color) != 3 or not all(isinstance(code, int) and 0 <= code < 256 for code in color):
-                logger.error(f"Failed. Error in color code: {color}")
+            if not isinstance(color, list) or len(color) != 3:
+                logger.error(f"Failed. Error in color code format: {color}")
+                return None
+            # Convert string values to integers if they're strings
+            try:
+                if all(isinstance(code, str) for code in color):
+                    color_int = [int(code) for code in color]
+                    if not all(0 <= code < 256 for code in color_int):
+                        logger.error(
+                            f"Failed. Color values out of range: {color}")
+                        return None
+                    # Update the color values to integers in the response
+                    json_response["lightSetting"]["color"] = color_int
+                elif not all(isinstance(code, int) and 0 <= code < 256 for code in color):
+                    logger.error(f"Failed. Invalid color values: {color}")
+                    return None
+            except ValueError:
+                logger.error(
+                    f"Failed. Color values not convertible to integers: {color}")
                 return None
 
     return json_response
