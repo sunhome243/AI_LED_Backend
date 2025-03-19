@@ -133,7 +133,7 @@ def get_past_reponse(uuid, timestamp=None):
     past_time_str = f"{past_hour:02d}:{time_parts[1]}:{time_parts[2]}"
     future_time_str = f"{future_hour:02d}:{time_parts[1]}:{time_parts[2]}"
 
-    # Create the sort key prefixes for the time range - without day information
+    # Create the sort key prefixes for the time range
     start_sort_key = f"TIME#{past_time_str}"
     end_sort_key = f"TIME#{future_time_str}"
 
@@ -154,25 +154,44 @@ def get_past_reponse(uuid, timestamp=None):
     table = dynamodb.Table('ResponseTable')
 
     try:
-        # Query DynamoDB with just the time part, ignoring day
-        response = table.query(
-            KeyConditionExpression=Key('uuid').eq(uuid_key) &
-            Key('TIME#DAY').begins_with(start_sort_key),
-            FilterExpression="begins_with(#time_day, :time_prefix)",
-            ExpressionAttributeNames={
-                "#time_day": "TIME#DAY"
-            },
-            ExpressionAttributeValues={
-                ":time_prefix": start_sort_key
-            },
-            ScanIndexForward=False,  # Get most recent first
-            Limit=20  # Limit to 20 most recent responses
-        )
+        # If time window crosses midnight (past_hour > future_hour), we need two queries
+        if past_hour > future_hour:
+            logger.info(
+                "Time range crosses midnight, performing two separate queries")
 
-        items = response.get('Items', [])
+            # First query: from past_hour to midnight (23:59:59)
+            response1 = table.query(
+                KeyConditionExpression=Key('uuid').eq(uuid_key) &
+                Key('TIME#DAY').between(start_sort_key,
+                                        f"TIME#23:59:59"),
+                ScanIndexForward=False,  # Get most recent first
+                Limit=20  # Limit to 20 most recent responses
+            )
+
+            # Second query: from midnight (00:00:00) to future_hour
+            response2 = table.query(
+                KeyConditionExpression=Key('uuid').eq(uuid_key) &
+                Key('TIME#DAY').between(f"TIME#00:00:00",
+                                        end_sort_key),
+                ScanIndexForward=False,
+                Limit=20
+            )
+
+            # Combine both result sets
+            items = response1.get('Items', []) + response2.get('Items', [])
+        else:
+            # Normal case - time window doesn't cross midnight
+            response = table.query(
+                KeyConditionExpression=Key('uuid').eq(uuid_key) &
+                Key('TIME#DAY').between(start_sort_key,
+                                        end_sort_key),
+                ScanIndexForward=False,
+                Limit=20
+            )
+            items = response.get('Items', [])
+
         logger.info(
             f"Retrieved {len(items)} past responses for user {uuid_key}")
-
         return items
     except Exception as e:
         logger.error(f"Error querying DynamoDB: {str(e)}")
