@@ -224,16 +224,45 @@ async def upload_response_dynamo(response, uuid, request_id):
     Returns:
         None
     """
-    # Get current date and time information for indexing
-    today = datetime.now().date()
-    day_of_week = today.weekday()
-    time = datetime.now().time()
+    # Use client-provided timestamp if available
+    day_of_week = None
+    formatted_time = None
+
+    if "timestamp" in response and isinstance(response["timestamp"], dict):
+        try:
+            # Parse the client timestamp in the format {time: "HH:MM:SS", dayOfWeek: "0"}
+            time_str = response["timestamp"].get("time")
+            day_of_week_str = response["timestamp"].get("dayOfWeek")
+
+            if time_str and day_of_week_str is not None:
+                day_of_week = int(day_of_week_str)
+                formatted_time = time_str
+
+                # Convert day from Sunday=0 format to Monday=0 format if needed for DB consistency
+                if day_of_week == 0:  # Sunday in frontend
+                    day_of_week = 6   # Sunday in DB (Monday=0, Sunday=6)
+                else:
+                    day_of_week = day_of_week - 1  # Other days adjustment
+
+                logger.info(
+                    f"Using client timestamp: time={formatted_time}, dayOfWeek={day_of_week}")
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning(f"Error parsing client timestamp: {e}")
+            day_of_week = None
+
+    # Fallback to server time if client timestamp is invalid or not provided
+    if day_of_week is None or formatted_time is None:
+        today = datetime.now().date()
+        day_of_week = today.weekday()  # 0 is Monday, 6 is Sunday
+        formatted_time = datetime.now().time().strftime("%H:%M:%S")
+        logger.info(
+            f"Using server timestamp: time={formatted_time}, dayOfWeek={day_of_week}")
 
     # Extract data needed for storage
     emotion_tag = response["emotion"]["main"]
     uuid_key = f'uuid#{uuid}'  # Format UUID as partition key
-    # Create sort key for querying by time/day - format as HH:MM:SS
-    formatted_time = time.strftime("%H:%M:%S")
+
+    # Create sort key for querying by time/day
     day_time_key = f'TIME#{formatted_time}#DAY#{day_of_week}'
     light_settings = response["lightSetting"]
     context = response["context"]

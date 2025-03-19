@@ -475,9 +475,20 @@ def lambda_handler(event, context):
             'body': json.dumps(f"Missing required parameters: {', '.join(missing_params)}")
         }
 
-    # Extract user credentials
+    # Extract user credentials and timestamp
     uuid = event['uuid']
     pin = event['pin']
+    # Extract timestamp from the event or use None if not available
+    timestamp = event.get('timestamp')
+
+    # Validate timestamp format if provided
+    if timestamp:
+        logger.info(f"Client timestamp received: {timestamp}")
+        # Basic validation for timestamp format
+        if not isinstance(timestamp, dict) or 'time' not in timestamp or 'dayOfWeek' not in timestamp:
+            logger.warning(
+                f"Invalid timestamp format: {timestamp}, will use server time")
+            timestamp = None
 
     # Validate UUID and PIN
     if not uuid or not isinstance(uuid, str):
@@ -580,13 +591,26 @@ def lambda_handler(event, context):
     # Add metadata to the response
     parsed_json["request_id"] = request_id
     parsed_json["uuid"] = uuid
-    parsed_json["timestamp"] = datetime.now().isoformat()
+
+    # Use client timestamp or create a new timestamp in the correct format
+    if timestamp:
+        parsed_json["timestamp"] = timestamp
+    else:
+        current_time = datetime.now()
+        parsed_json["timestamp"] = {
+            "time": current_time.strftime("%H:%M:%S"),
+            "dayOfWeek": str(current_time.weekday())
+        }
+        logger.info(
+            f"Using server-generated timestamp: {parsed_json['timestamp']}")
 
     # Invoke result-save-send Lambda to process the recommendation asynchronously
     try:
         result_lambda_name = os.environ.get(
             'RESULT_LAMBDA_NAME', 'result-save-send')
         logger.info(f"Invoking Lambda function: {result_lambda_name}")
+
+        # Make sure timestamp is included in the payload
         lambda_client.invoke(
             FunctionName=result_lambda_name,
             InvocationType='Event',  # for async invocation

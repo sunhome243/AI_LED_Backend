@@ -86,12 +86,13 @@ def auth_user(uuid, pin):
         raise AuthenticationError("Authentication failed")
 
 
-def get_past_reponse(uuid):
+def get_past_reponse(uuid, timestamp=None):
     """
     Retrieves past responses for a user within a 2-hour window.
 
     Args:
         uuid: User unique identifier
+        timestamp: Client-provided timestamp dictionary (optional)
 
     Returns:
         List of user response items within the timeframe
@@ -99,16 +100,44 @@ def get_past_reponse(uuid):
     Raises:
         Exception: If the DynamoDB query fails
     """
-    # Calculate time window boundaries (±1 hour from current time)
-    current_time = datetime.now()
-    one_hour = timedelta(hours=1)
-    future_time = current_time + one_hour
-    past_time = current_time - one_hour
+    # Use client-provided timestamp or fallback to server time
+    current_time_str = None
+    day = None
 
-    # Format times for the sort key format TIME#HH:MM:SS#DAY#d
-    future_time_str = future_time.strftime("%H:%M:%S")
-    past_time_str = past_time.strftime("%H:%M:%S")
-    day = current_time.weekday()  # 0 is Monday, 6 is Sunday
+    if timestamp and isinstance(timestamp, dict) and 'time' in timestamp and 'dayOfWeek' in timestamp:
+        try:
+            current_time_str = timestamp['time']
+            day = int(timestamp['dayOfWeek'])
+            # Convert day from Sunday=0 format to Monday=0 format if needed
+            # If frontend uses Sunday=0, we need to adjust for DB which uses Monday=0
+            if day == 0:  # Sunday in frontend
+                day = 6   # Sunday in DB (Monday=0, Sunday=6)
+            else:
+                day = day - 1  # Other days adjustment
+
+            logger.info(
+                f"Using client timestamp: time={current_time_str}, dayOfWeek={day}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Error parsing client timestamp: {e}")
+            current_time_str = None
+
+    # Fallback to server time if client time is invalid or not provided
+    if current_time_str is None or day is None:
+        current_time = datetime.now()
+        current_time_str = current_time.strftime("%H:%M:%S")
+        day = current_time.weekday()  # 0 is Monday, 6 is Sunday
+        logger.info(
+            f"Using server timestamp: time={current_time_str}, day={day}")
+
+    # Calculate time window boundaries (±1 hour from provided time)
+    time_parts = current_time_str.split(":")
+    hour = int(time_parts[0])
+
+    past_hour = (hour - 1) % 24
+    future_hour = (hour + 1) % 24
+
+    past_time_str = f"{past_hour:02d}:{time_parts[1]}:{time_parts[2]}"
+    future_time_str = f"{future_hour:02d}:{time_parts[1]}:{time_parts[2]}"
 
     # Create the sort key prefixes for the time range
     start_sort_key = f"TIME#{past_time_str}#DAY#{day}"
@@ -137,39 +166,19 @@ def get_past_reponse(uuid):
         logger.info(
             f"Retrieved {len(items)} past responses for user {uuid_key}")
 
-        # If no items found, try an alternative approach - query just by UUID
-        if not items:
-            logger.info(
-                f"No responses found with exact sort key format, attempting broader query")
-            # Query just by the partition key
-            response = table.query(
-                KeyConditionExpression=Key('uuid').eq(uuid_key),
-                ScanIndexForward=False,  # Get most recent first
-                Limit=20  # Limit to 20 most recent responses
-            )
-            items = response.get('Items', [])
-            logger.info(
-                f"Retrieved {len(items)} past responses using partition key only")
-
-            # Log the actual sort keys to understand the format
-            if items:
-                sort_keys = [item.get('sort_key')
-                             for item in items if 'sort_key' in item]
-                logger.info(
-                    f"Actual sort keys in the database: {sort_keys[:5]}")
-
         return items
     except Exception as e:
         logger.error(f"Error querying DynamoDB: {str(e)}")
         raise
 
 
-def get_genai_response(past_response):
+def get_genai_response(past_response, timestamp=None):
     """
     Generate a response using Gemini AI based on past user responses.
 
     Args:
         past_response: Past user responses from DynamoDB
+        timestamp: Client-provided timestamp dictionary (optional)
 
     Returns:
         The response from Gemini AI model
@@ -267,8 +276,29 @@ Current Time: Monday, 14:30
 }"""
 
         # Create a comprehensive prompt that includes both the instructions and user request
-        current_time = datetime.now()
-        current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        # Use client-provided timestamp or fallback to server time
+        if timestamp and isinstance(timestamp, dict) and 'time' in timestamp and 'dayOfWeek' in timestamp:
+            try:
+                time_str = timestamp['time']
+                day_num = int(timestamp['dayOfWeek'])
+
+                # Map day number to name
+                days = ["Sunday", "Monday", "Tuesday",
+                        "Wednesday", "Thursday", "Friday", "Saturday"]
+                day_name = days[day_num]
+
+                current_time_str = f"{day_name}, {time_str}"
+                logger.info(
+                    f"Using client timestamp in prompt: {current_time_str}")
+            except (ValueError, TypeError, IndexError) as e:
+                logger.warning(f"Error formatting client timestamp: {e}")
+                current_time = datetime.now()
+                current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            current_time = datetime.now()
+            current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(
+                f"Using server timestamp in prompt: {current_time_str}")
 
         if not past_response:
             user_prompt = f"Generate a lighting recommendation for a new user. Current time: {current_time_str}"
@@ -551,9 +581,14 @@ def lambda_handler(event, context):
             'body': json.dumps(f"Missing required parameters: {', '.join(missing_params)}")
         }
 
-    # Extract user credentials
+    # Extract user credentials and timestamp
     uuid = event['uuid']
     pin = event['pin']
+    timestamp = event.get('timestamp')
+
+    # Log client timestamp if available
+    if timestamp:
+        logger.info(f"Client timestamp received: {timestamp}")
 
     # Validate UUID and PIN
     if not uuid or not isinstance(uuid, str):
@@ -580,10 +615,10 @@ def lambda_handler(event, context):
             'body': json.dumps(str(e))
         }
 
-    # Retrieve past responses for context
+    # Retrieve past responses for context with client timestamp
     try:
-        # Get the past response of the user
-        past_response = get_past_reponse(uuid)
+        # Get the past response of the user with timestamp
+        past_response = get_past_reponse(uuid, timestamp)
         # Continue even if past_response is an empty list
         logger.info(
             f"Found {len(past_response)} past responses for UUID: {uuid}")
@@ -600,7 +635,7 @@ def lambda_handler(event, context):
     # Retry up to 3 times to get a valid response
     while retry < 3 and parsed_json is None:
         try:
-            gemini_response = get_genai_response(past_response)
+            gemini_response = get_genai_response(past_response, timestamp)
             parsed_json = verify_and_parse_json(gemini_response)
             if parsed_json is None:
                 logger.warning(
@@ -621,7 +656,16 @@ def lambda_handler(event, context):
     # Add metadata to the response
     parsed_json["request_id"] = request_id
     parsed_json["uuid"] = uuid
-    parsed_json["timestamp"] = datetime.now().isoformat()
+
+    # Use the client-provided timestamp or generate one in the required format
+    if timestamp and isinstance(timestamp, dict) and 'time' in timestamp and 'dayOfWeek' in timestamp:
+        parsed_json["timestamp"] = timestamp
+    else:
+        current_time = datetime.now()
+        parsed_json["timestamp"] = {
+            "time": current_time.strftime("%H:%M:%S"),
+            "dayOfWeek": str(current_time.weekday())
+        }
 
     # Try to invoke result-save-send Lambda to process the recommendation
     # But continue even if it fails due to permissions issues
@@ -630,6 +674,8 @@ def lambda_handler(event, context):
     try:
         logger.info(
             f"Attempting to invoke Lambda function: {result_lambda_name}")
+
+        # Make sure to include the timestamp in the payload
         lambda_client.invoke(
             FunctionName=result_lambda_name,
             InvocationType='Event',  # for async invocation
