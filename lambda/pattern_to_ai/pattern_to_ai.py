@@ -107,14 +107,8 @@ def get_past_reponse(uuid, timestamp=None):
     if timestamp and isinstance(timestamp, dict) and 'time' in timestamp and 'dayOfWeek' in timestamp:
         try:
             current_time_str = timestamp['time']
+            # We still parse day but won't use it for querying
             day = int(timestamp['dayOfWeek'])
-            # Convert day from Sunday=0 format to Monday=0 format if needed
-            # If frontend uses Sunday=0, we need to adjust for DB which uses Monday=0
-            if day == 0:  # Sunday in frontend
-                day = 6   # Sunday in DB (Monday=0, Sunday=6)
-            else:
-                day = day - 1  # Other days adjustment
-
             logger.info(
                 f"Using client timestamp: time={current_time_str}, dayOfWeek={day}")
         except (ValueError, TypeError) as e:
@@ -125,7 +119,7 @@ def get_past_reponse(uuid, timestamp=None):
     if current_time_str is None or day is None:
         current_time = datetime.now()
         current_time_str = current_time.strftime("%H:%M:%S")
-        day = current_time.weekday()  # 0 is Monday, 6 is Sunday
+        day = current_time.weekday()  # We still get day but won't use it for querying
         logger.info(
             f"Using server timestamp: time={current_time_str}, day={day}")
 
@@ -139,9 +133,9 @@ def get_past_reponse(uuid, timestamp=None):
     past_time_str = f"{past_hour:02d}:{time_parts[1]}:{time_parts[2]}"
     future_time_str = f"{future_hour:02d}:{time_parts[1]}:{time_parts[2]}"
 
-    # Create the sort key prefixes for the time range
-    start_sort_key = f"TIME#{past_time_str}#DAY#{day}"
-    end_sort_key = f"TIME#{future_time_str}#DAY#{day}"
+    # Create the sort key prefixes for the time range - without day information
+    start_sort_key = f"TIME#{past_time_str}"
+    end_sort_key = f"TIME#{future_time_str}"
 
     # Log the time window and sort keys for debugging
     logger.info(
@@ -154,10 +148,17 @@ def get_past_reponse(uuid, timestamp=None):
     table = dynamodb.Table('ResponseTable')
 
     try:
-        # Query DynamoDB with the correct sort key attribute name (not 'sort_key')
+        # Query DynamoDB with just the time part, ignoring day
         response = table.query(
             KeyConditionExpression=Key('uuid').eq(uuid_key) &
-            Key('TIME#DAY').between(start_sort_key, end_sort_key),
+            Key('TIME#DAY').begins_with(start_sort_key),
+            FilterExpression="begins_with(#time_day, :time_prefix)",
+            ExpressionAttributeNames={
+                "#time_day": "TIME#DAY"
+            },
+            ExpressionAttributeValues={
+                ":time_prefix": start_sort_key
+            },
             ScanIndexForward=False,  # Get most recent first
             Limit=20  # Limit to 20 most recent responses
         )
