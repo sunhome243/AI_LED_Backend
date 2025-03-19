@@ -55,17 +55,17 @@ client = genai.Client(api_key=google_gemini_api_key)
 
 def auth_user(uuid, pin):
     """
-    Authenticate user by comparing the provided pin with the stored pin in DynamoDB.
+    Authenticate user by comparing provided pin with stored pin in DynamoDB.
 
     Args:
-        uuid (str): The unique identifier for the user.
-        pin (str): The pin provided by the user.
+        uuid: User unique identifier
+        pin: User pin
 
     Raises:
-        AuthenticationError: If the authentication fails.
+        AuthenticationError: If authentication fails
 
     Returns:
-        bool: True if authentication is successful.
+        True if authentication successful
     """
     table = dynamodb.Table("AuthTable")
 
@@ -87,17 +87,16 @@ def auth_user(uuid, pin):
 
 def get_past_reponse(uuid):
     """
-    Retrieves past responses for a user within a 2-hour window (current time ±1 hour)
-    for generating contextual recommendations.
+    Retrieves past responses for a user within a 2-hour window.
 
     Args:
-        uuid (str): The unique identifier for the user.
+        uuid: User unique identifier
 
     Returns:
-        list: List of parsed user response items within the timeframe.
+        List of user response items within the timeframe
 
     Raises:
-        Exception: If the DynamoDB query fails.
+        Exception: If the DynamoDB query fails
     """
     # Calculate time window boundaries (±1 hour from current time)
     current_time = datetime.now()
@@ -117,10 +116,13 @@ def get_past_reponse(uuid):
     start_key = f"{time_day_prefix}#{past_time}#{day}"
     end_key = f"{time_day_prefix}#{future_time}#{day}"
 
+    # Format UUID with prefix to match how it's stored in the database
+    uuid_key = f'uuid#{uuid}'
+
     try:
         # Query DynamoDB for responses within the time window using resource API
         response = table.query(
-            KeyConditionExpression=Key('uuid').eq(uuid) &
+            KeyConditionExpression=Key('uuid').eq(uuid_key) &
             Key('TIME#DAY').between(start_key, end_key),
             Limit=20  # Limit to 20 most recent responses
         )
@@ -134,17 +136,16 @@ def get_past_reponse(uuid):
 
 def get_genai_response(past_response):
     """
-    Generate a response using the Gemini AI model based on past user responses.
-    Uses the "surprise me" configuration to generate novel lighting recommendations.
+    Generate a response using Gemini AI based on past user responses.
 
     Args:
-        past_response (dict): The past responses of the user from DynamoDB.
+        past_response: Past user responses from DynamoDB
 
     Returns:
-        dict: The response from the Gemini AI model.
+        The response from Gemini AI model
 
     Raises:
-        AIProcessingError: If Gemini AI processing fails
+        AIProcessingError: If AI processing fails
     """
     try:
         # Create the instruction text that would normally be in the system role
@@ -152,24 +153,87 @@ def get_genai_response(past_response):
 
 You are an AI that predicts and personalizes lighting based on broad time patterns, emotional state, and user context. Instead of matching exact timestamps, you analyze general trends to infer the most likely current activity. The AI must select either RGB color or Dynamic mode—never both.
 
-Core Functions:
-• Pattern Recognition: Retrieve and analyze past records (weekday, time range, emotion, context, RGB code, user feedback) to identify trends, not exact timestamps.
-• Context-Aware Prediction: If multiple past activities exist within a time range, choose the most frequent or contextually relevant one, rather than the latest.
-• Lighting Optimization: Adjust brightness and color dynamically based on historical patterns and current context.
-• Strict Output Rule: Only one lighting mode is allowed—either RGB color or Dynamic mode, never both.
+Core Functions
+	•	Pattern Recognition: Retrieve and analyze past records (weekday, time range, emotion, context, RGB code, user feedback) to identify trends, not exact timestamps.
+	•	Context-Aware Prediction: If multiple past activities exist within a time range, choose the most frequent or contextually relevant one, rather than the latest.
+	•	Lighting Optimization: Adjust brightness and color dynamically based on historical patterns and current context.
+	•	Strict Output Rule: Only one lighting mode is allowed—either RGB color or Dynamic mode, never both.
 
-Output Schema must be valid JSON with the following structure:
+Output Schema
+
+1️⃣ User Activity (activity)
+	•	main: General category (e.g., "study", "reading", "movie").
+	•	sub: Specific details ("math", "comic book", "horror movie").
+
+2️⃣ Light Settings (lightSetting)
+	•	Choose ONE of the following:
+	•	RGB Color: [R, G, B] based on prior preferences and environmental factors.
+	•	Dynamic Mode: "FADE3", "MUSIC2", etc. (Only if the activity requires it, e.g., music, party, gaming.)
+	•	Brightness Scaling: Adjust brightness based on time, activity, and previous feedback.
+	•	Power: true (on) or false (off).
+
+3️⃣ Emotional Analysis (emotion)
+	•	main: "Positive", "Negative", "Neutral"
+	•	sub: Top 3 detected emotions.
+
+4️⃣ Recommendation (recommendation)
+	•	Explain why this lighting choice was made.
+	•	Example: "Since you usually study between 12 PM - 3 PM on Mondays, bright white light is set for focus. Stay productive! ✨"
+
+5️⃣ Context (context)
+	•	Concise description (e.g., "Monday afternoon study session, feeling focused.").
+
+Guidelines
+
+Generalized Time Analysis
+	•	Instead of exact timestamps, analyze a time block (e.g., 14:00 - 15:00).
+	•	If multiple activities exist, prioritize the most frequent or logical choice.
+	•	If no clear pattern emerges, default to the most contextually fitting option.
+
+Strict Lighting Mode Selection
+	•	RGB Color Mode → For studying, reading, movies, relaxing.
+	•	Dynamic Mode → For music, parties, gaming (only if needed).
+	•	Never use both RGB and Dynamic Mode together.
+
+Conflict Resolution
+	•	If some pattern occurs often, but some patterns are rare, choose the dominant pattern (study/reading) even if the latest entry was a horror movie.
+
+Fallback Defaults
+	•	If no strong pattern is detected, infer activity using general time-of-day behavior.
+
+Example Correct Output (Fixing the Issue)
+
+Past Data Analysis (14:00 - 15:00 on Mondays)
+	•	Study @ 14:00 (Bright White)
+	•	Reading a book @ 14:20 (Bright White)
+	•	Reading a comic book @ 14:20 (Slightly Warm White)
+	•	Watching a horror movie @ 14:43 (Dim Red)
+
+Current Time: Monday, 14:30
+
+✅ Study and reading are more frequent than horror movies.
+✅ The AI selects only RGB mode (no Dynamic Mode).
+
 {
-  "context": "Brief description of the context",
+  "context": "It's Monday afternoon, and you're likely studying or reading.",
   "emotion": {
-    "main": "Primary emotion",
-    "subcategories": ["emotion1", "emotion2", "emotion3"]
+    "main": "Neutral",
+    "subcategories": [
+      "Focused",
+      "Calm",
+      "Engaged"
+    ]
   },
   "lightSetting": {
     "power": true,
-    "color": [255, 255, 255]
+    "color": [
+      "255",
+      "255",
+      "250"
+    ]
   },
-  "recommendation": "Friendly message explaining the lighting choice"
+  "recommendation": "Since you often study or read around this time on Mondays, a bright white light is set to help you focus. Keep up the good work! 📚✨"
+}
 }"""
 
         # Create a comprehensive prompt that includes both the instructions and user request
@@ -207,15 +271,13 @@ Output Schema must be valid JSON with the following structure:
 
 def verify_and_parse_json(response):
     """
-    Verify the JSON response to ensure it contains the required fields and valid values.
-    Performs validation of the AI-generated lighting configuration to ensure it meets
-    application requirements before being sent to devices.
+    Verify and validate JSON response from AI.
 
     Args:
-        response: The response object from Gemini API.
+        response: Response object from Gemini API
 
     Returns:
-        dict: The parsed JSON if valid, None otherwise.
+        Parsed JSON if valid, None otherwise
     """
     try:
         # Extract JSON from Gemini response
@@ -263,30 +325,17 @@ def verify_and_parse_json(response):
 
 def lambda_handler(event, context):
     """
-    Main Lambda handler function that processes "surprise me" lighting requests.
+    Process "surprise me" lighting requests based on user patterns.
 
-    This function:
-    1. Authenticates the user based on their UUID and PIN
-    2. Retrieves the user's past responses to establish context
-    3. Sends the context to Gemini AI to generate a personalized lighting recommendation
-    4. Validates the AI response to ensure it meets all requirements
-    5. Passes the recommendation to another Lambda function for saving and sending to devices
+    Authenticates user, retrieves context, generates AI recommendation,
+    and returns personalized lighting configuration.
 
     Args:
-        event (dict): Lambda event payload containing:
-                      - uuid: User's unique identifier
-                      - pin: User's authentication PIN
-        context (object): Lambda context object
+        event: Lambda event with user identification and request details
+        context: Lambda context
 
     Returns:
-        dict: API Gateway compatible response with:
-             - statusCode: HTTP status code (200, 400, 401, 404, 500)
-             - headers: Response headers
-             - body: Response body containing recommendation text and request ID or error message
-
-    Environment Variables:
-        REGION_NAME: AWS region (default: 'us-east-1')
-        GOOGLE_GEMINI_API_KEY: API key for Google's Gemini AI service
+        API Gateway response with status code, headers and body
     """
     # Validate required environment variables
     required_vars = ['REGION_NAME', 'GOOGLE_GEMINI_API_KEY']

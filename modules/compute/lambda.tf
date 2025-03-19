@@ -1,12 +1,12 @@
-# Common configuration for Lambda functions
+# Lambda function configuration
 locals {
-  # Lambda 기본 설정
+  # Default Lambda settings
   default_memory = 256
   default_timeout = 30
   small_memory = 128
   small_timeout = 10
   
-  # 단순화된 함수 정의
+  # Function configurations
   functions_to_create = {
     "audio_to_ai" = {
       filename         = data.archive_file.audio_to_ai_lambda.output_path
@@ -17,7 +17,6 @@ locals {
       timeout          = local.default_timeout
       environment      = merge(local.lambda_functions.audio_to_ai.environment, {
         PYTHONPATH = "/opt/python/lib/python3.9/site-packages:/var/task"
-        # Add layer version to force redeployment when layer changes
         LAMBDA_LAYER_VERSION = var.lambda_layer_version
       })
     },
@@ -57,7 +56,7 @@ locals {
   }
 }
 
-# Lambda 함수 생성 - 모든 함수를 동일한 방식으로 관리
+# Lambda function resources
 resource "aws_lambda_function" "functions" {
   for_each = local.functions_to_create
   
@@ -72,12 +71,12 @@ resource "aws_lambda_function" "functions" {
   publish          = true
   layers           = [var.lambda_layer_arn]
 
-  # Proper lifecycle configuration that allows Lambda updates
+  # Lifecycle configuration
   lifecycle {
     create_before_destroy = true
     ignore_changes = [
       tags,
-      # Do NOT ignore publish or source_code_hash to allow proper updates
+      # source_code_hash and publish explicitly not ignored to allow updates
     ]
   }
 
@@ -85,20 +84,17 @@ resource "aws_lambda_function" "functions" {
     variables = each.value.environment
   }
   
-  # Force redeployment by adding explicit layer dependency
   depends_on = [
     null_resource.check_archive_sizes,
-    null_resource.force_lambda_update  # New dependency
+    null_resource.force_lambda_update
   ]
 }
 
-# Create a resource to force Lambda redeployment when layer changes
+# Resource to force Lambda redeployment when layer changes
 resource "null_resource" "force_lambda_update" {
-  # This trigger will change whenever the Lambda layer changes
   triggers = {
     layer_version = var.lambda_layer_version
     layer_arn = var.lambda_layer_arn
-    # Added timestamp to force redeployment on apply
     deployment_time = timestamp()
   }
 }

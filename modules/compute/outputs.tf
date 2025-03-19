@@ -1,5 +1,5 @@
 locals {
-  # Helper to simplify function references - updated to use the correct resource
+  # Helper for function references
   function_outputs = {
     audio_to_ai     = aws_lambda_function.functions["audio_to_ai"]
     pattern_to_ai   = aws_lambda_function.functions["pattern_to_ai"]
@@ -8,15 +8,15 @@ locals {
   }
 }
 
-# Lambda ARN outputs
+# Map of all Lambda ARNs
 output "lambda_arns" {
   value = {
     for key, function in aws_lambda_function.functions : key => function.arn
   }
-  description = "Map of Lambda function ARNs"
+  description = "Map of all Lambda function ARNs"
 }
 
-# Individual ARN outputs for backward compatibility
+# Individual Lambda ARN outputs
 output "audio_to_ai_lambda_arn" {
   value       = aws_lambda_function.functions["audio_to_ai"].arn
   description = "ARN of the audio-to-ai Lambda function"
@@ -37,15 +37,15 @@ output "isConnect_lambda_arn" {
   description = "ARN of the isConnect Lambda function"
 }
 
-# Lambda function name outputs
+# Map of all Lambda function names
 output "lambda_names" {
   value = {
     for key, function in aws_lambda_function.functions : key => function.function_name
   }
-  description = "Map of Lambda function names"
+  description = "Map of all Lambda function names"
 }
 
-# Individual function name outputs for backward compatibility
+# Individual Lambda function name outputs
 output "audio_to_ai_function_name" {
   value       = aws_lambda_function.functions["audio_to_ai"].function_name
   description = "Name of the audio-to-ai Lambda function"
@@ -66,8 +66,8 @@ output "isConnect_function_name" {
   description = "Name of the isConnect Lambda function"
 }
 
-# Output for access to all Lambda functions
+# Complete access to all Lambda functions
 output "aws_lambda_function" {
-  description = "All lambda functions created by this module"
+  description = "All Lambda functions created by this module"
   value       = aws_lambda_function.functions
 }

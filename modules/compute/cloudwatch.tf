@@ -1,6 +1,6 @@
-# Dynamic data sources for existing CloudWatch log groups
+# CloudWatch log group configuration
 locals {
-  # Define function names for log groups in a map
+  # Function names for log groups
   log_group_functions = {
     "audio_to_ai"     = local.function_names.audio_to_ai
     "pattern_to_ai"   = local.function_names.pattern_to_ai
@@ -10,10 +10,7 @@ locals {
   }
 }
 
-# No data sources for CloudWatch log groups since we're not managing them
-
-# Only create log groups if explicitly set to manage them
-# This block will be effectively disabled with manage_log_groups = false
+# CloudWatch log groups (disabled by default)
 resource "aws_cloudwatch_log_group" "lambda_logs" {
   for_each          = local.manage_log_groups ? local.log_group_functions : {}
   name              = "/aws/lambda/${each.value}"

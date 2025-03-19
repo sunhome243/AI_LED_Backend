@@ -17,28 +17,27 @@ variable "stage_name" {
 
 variable "gateway_role_arn" {
   type        = string
-  description = "IAM role ARN for API Gateway CloudWatch logging (from IAM module)"
+  description = "IAM role ARN for API Gateway CloudWatch logging"
 }
 
 variable "pattern_to_ai_lambda_arn" {
   type        = string
-  description = "ARN of the pattern_to_ai Lambda function (from compute module)"
+  description = "ARN of the pattern_to_ai Lambda function"
 }
 
 variable "audio_to_ai_lambda_arn" {
   type        = string
-  description = "ARN of the audio_to_ai Lambda function (from compute module)"
+  description = "ARN of the audio_to_ai Lambda function"
 }
 
 variable "isConnect_lambda_arn" {
   type        = string
-  description = "ARN of the isConnect Lambda function (from compute module)"
+  description = "ARN of the isConnect Lambda function"
 }
 
-# Add AWS region data source
+# AWS region data source
 data "aws_region" "current" {}
 
-# Add new variables for function names
 variable "pattern_to_ai_function_name" {
   type        = string
   description = "Name of the pattern_to_ai Lambda function"

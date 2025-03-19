@@ -1,3 +1,7 @@
+# REST API Gateway Configuration
+# This defines the REST API Gateway resources for handling various API endpoints
+
+# Main API Gateway resource
 resource "aws_api_gateway_rest_api" "rest_api" {
   name = var.rest_api_name
   endpoint_configuration {
@@ -5,6 +9,11 @@ resource "aws_api_gateway_rest_api" "rest_api" {
   }
 }
 
+# ==============================================
+# API Resource Path Definitions
+# ==============================================
+
+# First-level resource paths
 resource "aws_api_gateway_resource" "pattern_to_ai" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   parent_id   = aws_api_gateway_rest_api.rest_api.root_resource_id
@@ -17,6 +26,7 @@ resource "aws_api_gateway_resource" "audio_to_ai" {
   path_part   = "audio_to_ai"
 }
 
+# Second-level resource paths
 resource "aws_api_gateway_resource" "pattern_to_ai_gateway_resource" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   parent_id   = aws_api_gateway_resource.pattern_to_ai.id
@@ -29,12 +39,18 @@ resource "aws_api_gateway_resource" "audio_to_ai_gateway_resource" {
   path_part   = "create"
 }
 
+# Root-level resource for connection check
 resource "aws_api_gateway_resource" "is_connect" {
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   parent_id   = aws_api_gateway_rest_api.rest_api.root_resource_id
   path_part   = "is_connect"
 }
 
+# ==============================================
+# API Method Definitions
+# ==============================================
+
+# HTTP methods for each resource endpoint
 resource "aws_api_gateway_method" "pattern_to_ai_http_method" {
   authorization = "NONE"
   http_method   = "POST"
@@ -56,8 +72,7 @@ resource "aws_api_gateway_method" "is_connect_http_method" {
   rest_api_id   = aws_api_gateway_rest_api.rest_api.id
 }
 
-# Integrations were moved to main.tf to break circular dependencies
-
+# CloudWatch configuration for API Gateway logging
 resource "aws_api_gateway_account" "api_gateway_account" {
   cloudwatch_role_arn = var.gateway_role_arn
 }
@@ -67,7 +82,11 @@ resource "aws_cloudwatch_log_group" "api_gateway_log_group" {
   retention_in_days = 7
 }
 
-# API Gateway Integrations - moved from main.tf
+# ==============================================
+# API Lambda Integrations
+# ==============================================
+
+# Pattern to AI Lambda integration
 resource "aws_api_gateway_integration" "pattern_to_ai_api_int" {
   depends_on = [aws_api_gateway_method.pattern_to_ai_http_method]
   
@@ -81,6 +100,7 @@ resource "aws_api_gateway_integration" "pattern_to_ai_api_int" {
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
 
+# Audio to AI Lambda integration
 resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
   http_method             = aws_api_gateway_method.audio_to_ai_http_method.http_method
   resource_id             = aws_api_gateway_resource.audio_to_ai_gateway_resource.id
@@ -92,6 +112,7 @@ resource "aws_api_gateway_integration" "audio_to_ai_api_int" {
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
 
+# Is Connect Lambda integration
 resource "aws_api_gateway_integration" "is_connect_api_int" {
   http_method             = aws_api_gateway_method.is_connect_http_method.http_method
   resource_id             = aws_api_gateway_resource.is_connect.id
@@ -103,7 +124,11 @@ resource "aws_api_gateway_integration" "is_connect_api_int" {
   passthrough_behavior    = "WHEN_NO_MATCH"
 }
 
+# ==============================================
 # CORS Configuration - OPTIONS Methods
+# ==============================================
+
+# OPTIONS methods for CORS preflight requests
 resource "aws_api_gateway_method" "pattern_to_ai_options_method" {
   rest_api_id   = aws_api_gateway_rest_api.rest_api.id
   resource_id   = aws_api_gateway_resource.pattern_to_ai_gateway_resource.id

@@ -56,17 +56,17 @@ CORS_HEADERS = {
 
 def auth_user(uuid, pin):
     """
-    Authenticate user by comparing the provided pin with the stored pin in DynamoDB.
+    Authenticate user against DynamoDB.
 
     Args:
-        uuid (str): The unique identifier for the user.
-        pin (str): The pin provided by the user.
+        uuid: User identifier
+        pin: User PIN
 
     Raises:
-        AuthenticationError: If the authentication fails.
+        AuthenticationError: If authentication fails
 
     Returns:
-        bool: True if authentication is successful.
+        True if authentication successful
     """
     table = dynamodb.Table("AuthTable")
 
@@ -88,17 +88,14 @@ def auth_user(uuid, pin):
 
 def store_wav_file(uuid, file):
     """
-    Store a binary audio file to a temporary location in Lambda's ephemeral storage.
-
-    Creates a temporary WAV file named after the user's UUID to be used for
-    audio processing with the Gemini AI model.
+    Store binary audio to temporary location.
 
     Args:
-        uuid (str): The unique identifier for the user.
-        file (bytes): The binary audio data to store.
+        uuid: User identifier
+        file: Binary audio data
 
     Returns:
-        str: The path to the stored temporary wav file.
+        Path to stored temp file
 
     Raises:
         IOError: If file writing fails
@@ -117,21 +114,16 @@ def store_wav_file(uuid, file):
 
 def get_genai_response(file):
     """
-    Generate a response using the Gemini AI model based on the uploaded audio file.
-
-    This function:
-    1. Reads the audio file as binary data
-    2. Configures and sends a prompt to process the audio content
-    3. Returns the AI-generated response for lighting configuration
+    Generate response from Gemini AI based on audio.
 
     Args:
-        file (str): Path to the audio file to be uploaded for processing.
+        file: Path to audio file
 
     Returns:
-        dict: The response from the Gemini AI model.
+        Response from Gemini AI
 
     Raises:
-        AIProcessingError: If Gemini AI processing fails
+        AIProcessingError: If AI processing fails
     """
     try:
         # Read the audio file directly instead of uploading
@@ -139,24 +131,107 @@ def get_genai_response(file):
             audio_data = f.read()
 
         # Create instruction text similar to pattern_to_ai
-        instruction_text = """Adaptive Personalized Lighting Assistant
+        instruction_text = """# Personalized Lighting Assistant
 
-You are an AI that analyzes audio to determine context, emotion, and activity to make personalized lighting recommendations.
-Based on the audio content, recommend appropriate lighting that enhances the detected mood, context or activity.
-The AI must select either RGB color or Dynamic mode—never both.
+You are an AI that analyzes audio input to create personalized lighting recommendations based on emotional state, context, and time of day.
 
-Output Schema must be valid JSON with the following structure:
-{
-  "context": "Brief description of the context detected in audio",
-  "emotion": {
-    "main": "Primary emotion detected",
-    "subcategories": ["emotion1", "emotion2", "emotion3"]
-  },
-  "lightSetting": {
-    "power": true,
-    "color": [255, 255, 255]
-  },
-  "recommendation": "Friendly message explaining the lighting choice based on audio"
+Analysis Functions
+- Audio Analysis: Detect emotional tone, context, and activity from user speech patterns and environmental sounds.
+- Lighting Recommendation: Create settings based on analysis, time of day, and light therapy research when beneficial.
+
+Output Schema (ALL fields REQUIRED)
+
+1. Keyword Object (`keyword`)
+- Purpose: Used for personalization by categorizing the user's activity.
+- Structure:
+  - `mainKeyword`: General activity category (e.g., `"game"`, `"study"`, `"movie"`, `"exercise"`, `"relax"`, `"music"`).
+  - `subKeyword`: More detailed and specific keyword related to the main activity.
+    - Examples:
+      - For Gaming: `{ "mainKeyword": "game", "subKeyword": "overwatch" }`
+      - For Movie Watching: `{ "mainKeyword": "movie", "subKeyword": "horror" }`
+      - For Studying: `{ "mainKeyword": "study", "subKeyword": "math" }`
+    - If no specific `subKeyword` is detected, it should be set to `"general"`.
+
+2. Light Settings (`lightSetting`)
+- Choose ONLY ONE option between `Color` and `Dynamic mode`:
+  - Color: RGB values as a string array (e.g., `["255", "0", "0"]`).
+    - Brightness Scaling (MUST BE UNDERSTOOD)
+      - `[0,0,0]` = Off (Darkest setting)
+      - `[255,255,255]` = Fully bright (Maximum brightness)
+      - AI must adjust brightness based on the environment and user context.
+        - Dark Environment (e.g., `"dark room"`, `"watching a movie"`) → Lower brightness
+        - Bright Environment (e.g., `"studying"`, `"working"`) → Higher brightness
+      - LED Strip Application:  
+        - These RGB values are used to control LED strip lighting.
+        - The AI must correctly adjust the lighting to provide an optimal experience.
+
+  - Dynamic (ONLY if truly necessary): Select ONE pattern:
+    - General Effects:
+      - `AUTO`: Automatically cycles through different lighting modes and effects.
+      - `SLOW`: Decreases the speed of color changes or effects.
+      - `QUICK`: Increases the speed of color changes or effects.
+      - `FLASH`: Activates a white light strobe mode.
+      - `FADE7`: Gradual transition between 7 colors.
+      - `FADE3`: Gradual transition between 3 colors.
+      - `JUMP7`: Abrupt change between 7 colors.
+      - `JUMP3`: Abrupt change between 3 colors.
+
+    - Music Reactive Effects (music1-4):
+      - `MUSIC1`: Gentle, slow response to music beats.
+      - `MUSIC2`: Moderate response to music.
+      - `MUSIC3`: Faster, more dynamic response.
+      - `MUSIC4`: Most sensitive and rapid response to music beats.
+
+    - DO NOT use dynamic mode unless it is truly necessary.
+    - Only apply dynamic effects for:
+      - Parties / Celebrations (e.g., `"party"`, `"birthday"`, `"celebration"`)
+      - High-energy activities (e.g., `"dancing"`, `"working out"`, `"rave"`)
+      - Music synchronization (explicit request or strong music-related context)
+
+- Power: Boolean (`true`=on, `false`=off).
+
+3. Emotional Analysis (`emotion`)
+- Main: Primary category (`Positive`, `Negative`, or `Neutral`).
+- Subcategories: Array of 3 specific emotions.
+
+4. User Support Information
+- Recommendation: Brief explanation of the lighting choice (1-2 sentences) with a user-friendly closing sentence. Use appropriate emoji. If light therapy knowledge was applied, mention it briefly in an accessible way.
+- Context: Concise description of the detected user situation (10-20 words).
+
+Implementation Guidelines
+
+Brightness Adjustment (MUST BE FOLLOWED)
+- `[0,0,0]` is the darkest setting (lights off).
+- `[255,255,255]` is the brightest setting (fully on).
+- AI must adjust brightness dynamically based on:
+  - Time of Day:
+    For example, 
+    - Morning/Daytime → Brighter, cooler lights (e.g., `[255, 255, 200]`)
+    - Evening/Nighttime → Warmer, softer lights (e.g., `[180, 100, 50]`)
+  - User Activity:
+    For example,
+    - `"watching a movie"` → Dim lighting (e.g., `[50, 0, 0]` for horror, `[80, 50, 50]` for romance)
+    - `"playing a game"` → Adapt to game theme (e.g., `"overwatch"` → Orange/Blue theme)
+    - `"studying"` → Bright white light (e.g., `[255, 255, 255]`)
+  - Implicit Dark Environment Prediction:
+    - If no explicit mention of brightness is given, infer the likely environment:
+      - Low Brightness (Dark Environment Expected):
+        - `"watching a movie"`, `"playing a horror game"`, `"relaxing"`, `"listening to calm music"`, `"meditating"`, `"chilling"`, `"sleeping"`, `"having a romantic dinner"`
+      - High Brightness (Bright Environment Expected):
+        - `"studying"`, `"exercising"`, `"cooking"`, `"working on a project"`, `"reading a book"`, `"cleaning"`, `"getting ready for the day"`
+
+Theme-Based Color Selection
+- If the user's activity has a single, clear theme color → Apply them:
+  - `"Deadpool"` →  red-ish
+  - `"Ocean"` →  blue-ish
+  - `"Sunset"` → warm orange -ish
+- If the theme has multiple conflicting colors or is unclear → Use general analysis instead:
+  - `"Christmas"` (Red & Green) → General analysis
+  - `"Halloween"` (Orange, Black, Purple) → General analysis
+  - `"Festival"` (Unclear colors) → General analysis
+
+Fallback Protocol
+- Use time-appropriate defaults when context is unclear.
 }"""
 
         # Create comprehensive prompt combining instruction and audio file
@@ -195,16 +270,13 @@ Output Schema must be valid JSON with the following structure:
 
 def verify_and_parse_json(response):
     """
-    Verify the JSON response to ensure it contains the required fields and valid values.
-
-    Performs validation of the AI-generated lighting configuration to ensure it meets
-    application requirements before being sent to devices.
+    Validate AI-generated lighting configuration.
 
     Args:
-        response: The response object from Gemini API.
+        response: Response object from Gemini API
 
     Returns:
-        dict: The parsed JSON if valid, None otherwise.
+        Parsed JSON if valid, None otherwise
     """
     try:
         # Extract JSON from Gemini response
@@ -252,32 +324,17 @@ def verify_and_parse_json(response):
 
 def lambda_handler(event, context):
     """
-    Main Lambda handler function that processes audio-based lighting requests.
+    Process audio-based lighting requests.
 
-    This function:
-    1. Validates required parameters and environment variables
-    2. Decodes and stores the base64 audio file
-    3. Authenticates the user based on their UUID and PIN
-    4. Sends the audio to Gemini AI to generate a lighting recommendation
-    5. Validates the AI response to ensure it meets all requirements
-    6. Passes the recommendation to another Lambda function for saving and sending to devices
+    Authenticates user, processes audio, gets AI recommendation,
+    and returns lighting configuration.
 
     Args:
-        event (dict): Lambda event payload containing:
-                      - uuid: User's unique identifier
-                      - pin: User's authentication PIN
-                      - file: Base64-encoded audio file
-        context (object): Lambda context object
+        event: Lambda event with user identification and audio file
+        context: Lambda context
 
     Returns:
-        dict: API Gateway compatible response with:
-             - statusCode: HTTP status code (200, 400, 401, 500)
-             - headers: Response headers
-             - body: Response body containing recommendation text and request ID or error message
-
-    Environment Variables:
-        REGION_NAME: AWS region (default: 'us-east-1')
-        GOOGLE_GEMINI_API_KEY: API key for Google's Gemini AI service
+        API Gateway response with status code, headers and body
     """
     # Validate required environment variables
     required_vars = ['REGION_NAME', 'GOOGLE_GEMINI_API_KEY']

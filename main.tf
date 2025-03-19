@@ -6,7 +6,7 @@ terraform {
     }
   }
   
-  # Backend configuration should be in the terraform block
+  # S3 backend configuration for storing Terraform state
   backend "s3" {
     bucket  = "terraform-state-backend-20252"
     key     = "state/terraform.tfstate"
@@ -24,17 +24,21 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 }
 
-# First create the database module
+# ==============================================
+# Module Initialization
+# ==============================================
+
+# 1. Database Module - Creates DynamoDB tables and S3 bucket
 module "database" {
   source = "./modules/database"
 }
 
-# Then create IAM with database dependencies
+# 2. IAM Module - Creates roles and policies for all resources
 module "iam" {
   source     = "./modules/iam"
   depends_on = [module.database]
 
-  # Pass the database resources to IAM module
+  # Database resource dependencies
   connection_table_arn = module.database.connection_table_arn
   auth_table_arn       = module.database.auth_table_arn
   ircode_table_arn     = module.database.ircode_table_arn
@@ -42,7 +46,7 @@ module "iam" {
   response_table_arn   = module.database.response_table_arn
 }
 
-# Create WebSocket module after database and IAM
+# 3. WebSocket Module - Creates WebSocket API Gateway and handler
 module "websocket" {
   source                = "./modules/websocket"
   depends_on            = [module.iam, module.database, null_resource.build_lambda_layer]
@@ -52,16 +56,14 @@ module "websocket" {
   lambda_layer_arn      = aws_lambda_layer_version.lambda_dependencies.arn
 }
 
-# Now create compute module after WebSocket is created
+# 4. Compute Module - Creates Lambda functions for business logic
 module "compute" {
   source     = "./modules/compute"
   depends_on = [module.iam, module.database, module.websocket, null_resource.build_lambda_layer]
 
-  # Pass required resources to compute module
-  google_gemini_api_key = var.GOOGLE_GEMINI_API_KEY  # Add this line for the new variable name
-  GOOGLE_GEMINI_API_KEY = var.GOOGLE_GEMINI_API_KEY  # Keep for backward compatibility
-  aws_region            = var.REGION_NAME            # Add this line for the new variable name
-  REGION_NAME           = var.REGION_NAME            # Keep for backward compatibility
+  # Required configuration and resource dependencies
+  google_gemini_api_key = var.GOOGLE_GEMINI_API_KEY
+  aws_region            = var.REGION_NAME
   lambda_role_arn       = module.iam.lambda_role_arn
   response_bucket_name  = module.database.response_bucket_name
   websocket_endpoint    = module.websocket.websocket_api_endpoint
@@ -71,53 +73,21 @@ module "compute" {
   lambda_layer_version  = aws_lambda_layer_version.lambda_dependencies.version
 }
 
+# 5. Networking Module - Creates REST API Gateway and integrations
 module "networking" {
   source     = "./modules/networking"
-  depends_on = [module.compute]  # Simplified dependency
+  depends_on = [module.compute]
 
+  # Lambda function dependencies
   pattern_to_ai_lambda_arn = module.compute.pattern_to_ai_lambda_arn
   audio_to_ai_lambda_arn   = module.compute.audio_to_ai_lambda_arn
   isConnect_lambda_arn     = module.compute.isConnect_lambda_arn
   
-  # Add function names
+  # Lambda function names for permissions
   pattern_to_ai_function_name = module.compute.pattern_to_ai_function_name
   audio_to_ai_function_name   = module.compute.audio_to_ai_function_name
   isConnect_function_name     = module.compute.isConnect_function_name
   
+  # IAM role for API Gateway
   gateway_role_arn         = module.iam.api_gateway_role_arn
 }
-
-# Import statements in the root module for Lambda functions
-# These import statements replace the ones previously in the modules
-# 수정된 형식으로 임포트 구문 작성 - 모듈의 리소스를 올바르게 참조하기 위해
-
-# 각 Lambda 함수의 임포트 블록
-# 주의: 임포트는 초기 1회만 필요하므로 주석 처리하고 필요할 때만 활성화
-/*
-# Import websocket messenger lambda
-import {
-  id = "ws-messenger"
-  to = module.websocket.aws_lambda_function.ws_messenger_lambda
-}
-
-# Import compute module lambdas
-import {
-  id = "audio-to-ai"
-  to = module.compute.aws_lambda_function.functions["audio_to_ai"]
-}
-
-import {
-  id = "pattern-to-ai"
-  to = module.compute.aws_lambda_function.functions["pattern_to_ai"]
-}
-
-import {
-  id = "result-save-send"
-  to = module.compute.aws_lambda_function.functions["result_save_send"]
-}
-
-import {
-  id = "is-connect"
-  to = module.compute.aws_lambda_function.functions["isConnect"]
-}
-*/

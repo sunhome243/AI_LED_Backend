@@ -19,10 +19,10 @@ locals {
     "${local.base_dir}/lambda/websocket/${file}"
   ]
   
-  # More reliable source hash calculation
+  # More reliable source hash calculation for content-based deployments
   ws_messenger_source_hash = sha256(join("", [for f in local.ws_messenger_files : filesha256(f)]))
   
-  # CloudWatch 로그 관리 여부 설정
+  # CloudWatch log group management flag
   manage_ws_log_group = false
 }
 

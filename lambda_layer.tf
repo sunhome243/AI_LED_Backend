@@ -1,24 +1,24 @@
-# Create a Lambda layer for common Python dependencies
+# Lambda Layer Configuration
+# This creates a Lambda layer containing shared Python dependencies for all Lambda functions
+
+# Create a Lambda layer from the pre-built zip file
 resource "aws_lambda_layer_version" "lambda_dependencies" {  
   layer_name = "lambda-dependencies"
   compatible_runtimes = ["python3.9"]
   
-  # Path to the layer content
+  # Path to the layer content zip file
   filename         = "${path.module}/lambda_layer.zip"
   
-  # Use source_code_hash only if the file exists
+  # Only calculate hash if the file exists
   source_code_hash = fileexists("${path.module}/lambda_layer.zip") ? filebase64sha256("${path.module}/lambda_layer.zip") : null
   
-  description = "Lambda layer containing common Python dependencies"
-  
-  # Remove count parameter to ensure the resource is always created
-  # This makes it work more reliably in CI/CD environments
+  description = "Shared Python libraries for Lambda functions including Google API clients and HTTP tools"
 }
 
-# Initialize an empty zip file to prevent "file not found" errors
+# Create an initial empty zip if it doesn't exist
+# This prevents "file not found" errors during the first apply
 resource "null_resource" "init_layer_zip" {
   triggers = {
-    # Always run this first
     always_run = "${timestamp()}"
   }
   
@@ -33,10 +33,11 @@ resource "null_resource" "init_layer_zip" {
   }
 }
 
-# Lambda layer build process that works in both local and CI/CD environments
+# Build the Lambda layer by installing dependencies into a directory structure
+# that Lambda can use at runtime
 resource "null_resource" "build_lambda_layer" {
   triggers = {
-    # Rebuild when requirements change or force build with trigger
+    # Rebuild when requirements change or when manually triggered
     requirements_hash = fileexists("${path.module}/requirements.txt") ? filebase64sha256("${path.module}/requirements.txt") : "default"
     rebuild_trigger = "13"  # Increment to force rebuild
   }
@@ -56,7 +57,7 @@ resource "null_resource" "build_lambda_layer" {
   depends_on = [null_resource.init_layer_zip]
 }
 
-# Validation that's more CI/CD friendly
+# Validate the created Lambda layer to ensure it contains required dependencies
 resource "null_resource" "validate_lambda_layer" {
   triggers = {
     # Run validation after build
@@ -74,7 +75,7 @@ resource "null_resource" "validate_lambda_layer" {
       
       echo "Layer size: $(du -h "${path.module}/lambda_layer.zip" | cut -f1)"
       
-      # Simple check for critical packages - exit code 0 for CI/CD
+      # Check for critical packages
       unzip -l "${path.module}/lambda_layer.zip" | grep -i -E 'shortuuid|google|httpx' || echo "WARNING: Some packages might be missing"
     EOT
   }

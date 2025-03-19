@@ -1,11 +1,11 @@
-# API Key variables - normalize to single variable names
+# API Key variables
 variable "google_gemini_api_key" {
   type        = string
   description = "API key for Google Gemini AI services"
   sensitive   = true
 }
 
-# Region variables - normalize to single variable names
+# Region variables
 variable "aws_region" {
   type        = string
   description = "AWS region where resources will be deployed"
@@ -57,31 +57,4 @@ variable "rest_api_execution_arn" {
   type        = string
   description = "Execution ARN of the REST API Gateway"
   default     = ""
-}
-
-# Deprecated variables - kept for backward compatibility
-variable "GOOGLE_GEMINI_API_KEY" {
-  type        = string
-  description = "[Deprecated] Use google_gemini_api_key instead"
-  sensitive   = true
-  default     = ""
-}
-
-variable "REGION_NAME" {
-  type        = string
-  description = "[Deprecated] Use aws_region instead"
-  default     = ""
-}
-
-variable "ws_api_endpoint" {
-  type        = string
-  description = "[Deprecated] Use websocket_endpoint instead"
-  default     = ""
-}
-
-# Local computed variables to handle deprecated variable usage
-locals {
-  effective_gemini_key = coalesce(var.google_gemini_api_key, var.GOOGLE_GEMINI_API_KEY)
-  effective_region = coalesce(var.aws_region, var.REGION_NAME)
-  effective_ws_endpoint = coalesce(var.websocket_endpoint, var.ws_api_endpoint)
 }

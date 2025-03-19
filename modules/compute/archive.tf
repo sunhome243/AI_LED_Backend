@@ -1,8 +1,8 @@
 locals {
-  # Define the path to the directory that contains both lambda and modules directories
+  # Base directory path for source code
   base_dir = abspath("${path.root}")
   
-  # Define source directories and their destinations in a map format
+  # Lambda source directories configuration
   lambda_sources = {
     "audio_to_ai" = {
       source_dir = "${local.base_dir}/lambda/audio_to_ai"
@@ -23,7 +23,7 @@ locals {
     }
   }
   
-  # Calculate file lists and hashes dynamically
+  # Calculate file lists for Lambda archives
   file_lists = {
     for key, config in local.lambda_sources : key => [
       for file in fileset(config.source_dir, config.files_pattern) : 
@@ -31,23 +31,23 @@ locals {
     ]
   }
   
-  # Calculate hash of source files to detect changes more reliably
+  # Generate hash of source files for change detection
   source_hashes = {
     for key, files in local.file_lists : key => 
       sha256(join("", [for f in files : filesha256(f)]))
   }
   
-  # Define maximum size warning threshold (5MB)
+  # Archive size warning threshold (5MB)
   max_size_warning = 5 * 1024 * 1024
   
-  # Output archive paths for debugging
+  # Archive output paths
   archive_paths = {
     for key in keys(local.lambda_sources) : key => 
       "${path.module}/archive/${key}_${local.source_hashes[key]}.zip"
   }
 }
 
-# Create archive directory explicitly before any operations
+# Create archive directory
 resource "null_resource" "ensure_archive_dir" {
   triggers = {
     always_run = "${timestamp()}"
@@ -62,7 +62,6 @@ resource "null_resource" "ensure_archive_dir" {
 resource "null_resource" "prepare_isConnect_dir" {
   triggers = {
     source_hash = local.source_hashes["isConnect"]
-    # Force execution every time
     always_run = "${timestamp()}"
   }
   
@@ -75,7 +74,6 @@ resource "null_resource" "prepare_isConnect_dir" {
         echo "Copied isConnect.py to temporary directory"
       else
         echo "WARNING: isConnect.py not found at expected location"
-        # Create an empty file to prevent archive failure
         echo "# Placeholder file" > ${path.module}/isConnect_tmp/isConnect.py
       fi
       echo "Prepared isConnect directory for packaging"
@@ -86,7 +84,7 @@ resource "null_resource" "prepare_isConnect_dir" {
   depends_on = [null_resource.ensure_archive_dir]
 }
 
-# Regular Lambda archives
+# Lambda function archives
 data "archive_file" "audio_to_ai_lambda" {
   type        = "zip"
   source_dir  = local.lambda_sources.audio_to_ai.source_dir
@@ -116,10 +114,9 @@ data "archive_file" "isConnect_lambda" {
   depends_on  = [null_resource.prepare_isConnect_dir]
 }
 
-# Consolidated size check
+# Archive size verification
 resource "null_resource" "check_archive_sizes" {
   triggers = {
-    # Track all hash changes
     hashes = join(",", [for key, hash in local.source_hashes : "${key}=${hash}"])
   }
   
@@ -127,7 +124,6 @@ resource "null_resource" "check_archive_sizes" {
     command = <<-EOT
       echo "Checking Lambda archive sizes..."
       
-      # Check all archives in a loop
       check_size() {
         local file=$1
         local name=$2
@@ -155,19 +151,16 @@ resource "null_resource" "check_archive_sizes" {
   ]
 }
 
-# Consolidated cleanup
+# Cleanup old archives
 resource "null_resource" "cleanup_resources" {
   triggers = {
-    # Run on every apply
     always_run = "${timestamp()}"
   }
   
   provisioner "local-exec" {
     command = <<-EOT
       echo "Cleaning up resources..."
-      # Clean up old archives
       find ${path.module}/archive -name "*.zip" -type f -mtime +1 -delete || echo "No old archives to clean"
-      # Clean up isConnect tmp directory after use
       rm -rf ${path.module}/isConnect_tmp || true
       echo "Cleanup complete!"
     EOT

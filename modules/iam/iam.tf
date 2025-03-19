@@ -13,13 +13,13 @@ data "aws_iam_policy_document" "assume_role" {
 resource "aws_iam_role" "iam_for_lambda" {
   name               = "iam_for_lambda"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
-  description        = "IAM role for Lambda functions with necessary permissions"
+  description        = "IAM role for Lambda functions with permissions for DynamoDB, S3, CloudWatch, and API Gateway"
 }
 
-# CloudWatch Logs permissions for all Lambda functions
+# CloudWatch Logs permissions
 resource "aws_iam_policy" "lambda_logging_policy" {
   name        = "lambda_logging_policy"
-  description = "Allow Lambda to write logs to CloudWatch"
+  description = "Allows Lambda functions to write logs to CloudWatch"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -40,7 +40,7 @@ resource "aws_iam_policy" "lambda_logging_policy" {
 # API Gateway Management permissions
 resource "aws_iam_policy" "apigateway_management_policy" {
   name        = "lambda_apigateway_management_policy"
-  description = "Allow Lambda to use API Gateway Management API"
+  description = "Allows Lambda functions to manage API Gateway WebSocket connections"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -60,7 +60,7 @@ resource "aws_iam_policy" "apigateway_management_policy" {
 # DynamoDB access permissions
 resource "aws_iam_policy" "lambda_dynamodb_policy" {
   name        = "lambda_dynamodb_policy"
-  description = "Allow Lambda to access DynamoDB tables"
+  description = "Allows Lambda functions to perform CRUD operations on DynamoDB tables"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -89,7 +89,7 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
 # S3 access permissions
 resource "aws_iam_policy" "lambda_s3_policy" {
   name        = "lambda_s3_policy"
-  description = "Allow Lambda to write to S3 bucket"
+  description = "Allows Lambda functions to read from and write to S3 bucket"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -109,7 +109,7 @@ resource "aws_iam_policy" "lambda_s3_policy" {
 # Lambda invocation policy for API Gateway
 resource "aws_iam_policy" "lambda_invoke_policy" {
   name        = "lambda_invoke_policy"
-  description = "Allow API Gateway to invoke Lambda functions"
+  description = "Allows API Gateway to invoke Lambda functions"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -143,10 +143,10 @@ resource "aws_iam_role" "api_gateway_role" {
   })
 }
 
-# Specific policy for API Gateway CloudWatch logging
+# API Gateway CloudWatch logging policy
 resource "aws_iam_policy" "api_gateway_logging_policy" {
   name        = "api_gateway_logging_policy"
-  description = "Allow API Gateway to push logs to CloudWatch"
+  description = "Allows API Gateway to push logs to CloudWatch"
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -168,10 +168,10 @@ resource "aws_iam_policy" "api_gateway_logging_policy" {
   })
 }
 
-# Add new Lambda-to-Lambda invocation policy
+# Lambda-to-Lambda invocation policy
 resource "aws_iam_policy" "lambda_to_lambda_policy" {
   name        = "lambda_to_lambda_policy"
-  description = "Allow Lambda functions to invoke other Lambda functions"
+  description = "Allows Lambda functions to invoke other Lambda functions"
 
   policy = jsonencode({
     Version = "2012-10-17"

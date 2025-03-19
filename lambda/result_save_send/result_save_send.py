@@ -24,13 +24,13 @@ dynamodb = boto_session.resource('dynamodb')
 
 async def configure_light_settings(json_response):
     """
-    Configure light settings based on the JSON response from Gemini AI.
+    Configure light settings based on the AI response.
 
     Args:
-        json_response (dict): The parsed JSON response containing light settings.
+        json_response: Parsed JSON response with light settings
 
     Returns:
-        str: A JSON string containing the light configuration and IR codes.
+        JSON string with light configuration and IR codes
     """
     light_setting = json_response["lightSetting"]
     device_type = "light"
@@ -78,14 +78,14 @@ async def configure_light_settings(json_response):
 
 def get_ir_code_from_table(device_type, ir_id):
     """
-    Generic function to retrieve IR codes from DynamoDB.
+    Retrieve IR codes from DynamoDB.
 
     Args:
-        device_type (str): Type of device to control
-        ir_id (int): ID of the IR code to retrieve
+        device_type: Type of device to control
+        ir_id: ID of the IR code
 
     Returns:
-        str: The IR code or None if not found
+        IR code or None if not found
     """
     table = dynamodb.Table("IrCodeTable")
     try:
@@ -112,13 +112,13 @@ def get_ir_code_from_table(device_type, ir_id):
 
 def get_ir_code(device_type):
     """
-    Get the IR codes for RGB control from DynamoDB.
+    Get IR codes for RGB control.
 
     Args:
-        device_type (str): The type of device.
+        device_type: Type of device
 
     Returns:
-        dict: Dictionary containing IR codes for RGB up/down control.
+        Dictionary of IR codes for RGB controls
     """
     result = DEFAULT_IR_RESULT.copy()
 
@@ -134,14 +134,14 @@ def get_ir_code(device_type):
 
 def get_dynamic_mode(dynamic_mode, device_type):
     """
-    Get the IR code for the dynamic mode.
+    Get IR code for dynamic mode.
 
     Args:
-        dynamic_mode (str): The dynamic mode.
-        device_type (str): The type of device.
+        dynamic_mode: Dynamic mode name
+        device_type: Type of device
 
     Returns:
-        dict: Dictionary containing IR code for the dynamic mode and power.
+        Dictionary with IR codes for dynamic mode
     """
     # Initialize result with default values
     result = DEFAULT_IR_RESULT.copy()
@@ -178,14 +178,15 @@ def get_dynamic_mode(dynamic_mode, device_type):
 
 async def upload_response_s3(response, uuid, request_id):
     """
-    Upload the JSON response to an S3 bucket.
+    Upload JSON response to S3 bucket.
 
     Args:
-        response (str): The JSON response as a string.
-        uuid (str): The unique identifier for the user.
+        response: JSON response string
+        uuid: User identifier
+        request_id: Request identifier
 
     Returns:
-        str: The S3 key of the uploaded file or None if upload fails.
+        S3 key of uploaded file or None if failed
     """
     if not response:
         logger.warning("Empty response, skipping S3 upload")
@@ -213,18 +214,15 @@ async def upload_response_s3(response, uuid, request_id):
 
 async def upload_response_dynamo(response, uuid, request_id):
     """
-    Upload the AI response data to DynamoDB for persistent storage and future analysis.
+    Upload AI response to DynamoDB.
 
     Args:
-        response (dict): The parsed JSON response containing emotion and light settings
-        uuid (str): The unique identifier of the user/device
-        request_id (str): The unique identifier for this specific request
+        response: Parsed JSON with emotion and light settings
+        uuid: User/device identifier
+        request_id: Request identifier
 
     Returns:
         None
-
-    Raises:
-        Exception: If DynamoDB operations fail
     """
     # Get current date and time information for indexing
     today = datetime.now().date()
@@ -234,8 +232,8 @@ async def upload_response_dynamo(response, uuid, request_id):
     # Extract data needed for storage
     emotion_tag = response["emotion"]["main"]
     uuid_key = f'uuid#{uuid}'  # Format UUID as partition key
-    # Create sort key for querying by day/time
-    day_time_key = f'DAY#{day_of_week}#TIME#{time}'
+    # Create sort key for querying by time/day
+    day_time_key = f'TIME#{time}#DAY#{day_of_week}'
     light_settings = response["lightSetting"]
     context = response["context"]
 
@@ -261,13 +259,13 @@ async def upload_response_dynamo(response, uuid, request_id):
 
 async def get_connection_id(uuid):
     """
-    Get the connection ID from the DynamoDB table.
+    Get WebSocket connection ID from DynamoDB.
 
     Args:
-        uuid (str): The unique identifier for the user.
+        uuid: User identifier
 
     Returns:
-        str: The connection ID or None if not found.
+        Connection ID or None if not found
     """
     table = dynamodb.Table("ConnectionIdTable")
 
@@ -285,17 +283,18 @@ async def get_connection_id(uuid):
 
 async def send_data_to_arduino(connection_id, response):
     """
-    Send the response data to arduino with the connection id.
+    Send response data to Arduino via WebSocket.
 
     Args:
-        connection_id: connection id of the target arduino's web socket.
-        response: response data to be sent to the arduino.
+        connection_id: WebSocket connection ID
+        response: Response data
 
     Returns:
-        api_response: response from the api gateway.
+        API Gateway response
 
     Raises:
-        Exception: If sending data fails
+        ValueError: If required params missing
+        Exception: If sending fails
     """
     websocket_url = os.environ.get('WEBSOCKET_URL')
     if not websocket_url:
@@ -335,24 +334,17 @@ async def send_data_to_arduino(connection_id, response):
 
 async def main(event, context):
     """
-    Main async function that orchestrates the response processing workflow.
+    Orchestrate response processing workflow.
 
-    Performs several concurrent operations:
-    1. Configures light settings based on AI response
-    2. Retrieves the WebSocket connection ID for the target device
-    3. Uploads the response to S3 for storage
-    4. Saves the response metadata to DynamoDB
+    Configures light settings, retrieves connection ID,
+    stores response, and sends to device.
 
     Args:
-        event (dict): Lambda event data containing UUID, request ID and AI response
-        context (object): Lambda context object
+        event: Lambda event with UUID, request ID and AI response
+        context: Lambda context
 
     Returns:
-        None: The function performs side effects but doesn't return data
-
-    Raises:
-        TimeoutError: If the operations take too long
-        Exception: For other processing errors
+        None
     """
     # Extract identifiers from the event
     uuid = event.get("uuid")
@@ -428,28 +420,16 @@ async def main(event, context):
 
 def lambda_handler(event, context):
     """
-    Lambda handler function that processes incoming events from API Gateway
-    and orchestrates the response processing workflow.
+    Process incoming events and orchestrate response workflow.
 
-    This function:
-    1. Receives the AI response data
-    2. Configures light settings based on the response
-    3. Retrieves the connection ID for the target device
-    4. Saves the response to S3 and DynamoDB
-    5. Sends the configuration to the connected Arduino device
+    Parses event, runs async workflow, and returns API response.
 
     Args:
-        event (dict): The event dict from Lambda trigger containing:
-                        - uuid: Unique identifier for the user/device
-                        - requestId: Unique identifier for this request
-                        - lightSetting: Light configuration parameters
-                        - emotion: Map of detected emotions from the AI
-                        - recommendation: Textual explanation of the lighting choice
-                        - context: Additional contextual information
-        context (object): Lambda context object
+        event: Lambda event with response data
+        context: Lambda context
 
     Returns:
-        dict: API Gateway compatible response with statusCode and body
+        API Gateway response
     """
     # Process the event if it's coming from API Gateway
     if 'body' in event:
