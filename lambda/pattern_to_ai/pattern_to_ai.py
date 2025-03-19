@@ -238,13 +238,19 @@ Current Time: Monday, 14:30
 }"""
 
         # Create a comprehensive prompt that includes both the instructions and user request
+        current_time = datetime.now()
+        current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+
         if not past_response:
-            user_prompt = "Generate a lighting recommendation for a new user."
+            user_prompt = f"Generate a lighting recommendation for a new user. Current time: {current_time_str}"
         else:
-            user_prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation."
+            user_prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation. Current time: {current_time_str}"
 
         # Combine the instruction and user prompt
         combined_prompt = f"{instruction_text}\n\nUser Request: {user_prompt}"
+
+        # Log the request being sent to the AI
+        logger.info(f"Sending request to Gemini AI: {user_prompt}")
 
         # Create contents with just the combined text
         contents = [
