@@ -103,33 +103,62 @@ def get_past_reponse(uuid):
     current_time = datetime.now()
     one_hour = timedelta(hours=1)
     future_time = current_time + one_hour
-    future_time = future_time.strftime("%H:%M")
     past_time = current_time - one_hour
-    past_time = past_time.strftime("%H:%M")
-    day = datetime.today().weekday()
 
-    # Get the DynamoDB table reference
-    table = dynamodb.Table('ResponseTable')
+    # Format times for the sort key format TIME#HH:MM:SS#DAY#d
+    future_time_str = future_time.strftime("%H:%M:%S")
+    past_time_str = past_time.strftime("%H:%M:%S")
+    day = current_time.weekday()  # 0 is Monday, 6 is Sunday
 
-    # Create the composite sort key values based on your actual schema
-    # Changed from DAY#TIME to TIME#DAY as per the error message
-    time_day_prefix = f"TIME#DAY"
-    start_key = f"{time_day_prefix}#{past_time}#{day}"
-    end_key = f"{time_day_prefix}#{future_time}#{day}"
+    # Create the sort key prefixes for the time range
+    start_sort_key = f"TIME#{past_time_str}#DAY#{day}"
+    end_sort_key = f"TIME#{future_time_str}#DAY#{day}"
+
+    # Log the time window and sort keys for debugging
+    logger.info(
+        f"Querying for responses with sort keys between {start_sort_key} and {end_sort_key}")
 
     # Format UUID with prefix to match how it's stored in the database
     uuid_key = f'uuid#{uuid}'
 
+    # Get the DynamoDB table reference
+    table = dynamodb.Table('ResponseTable')
+
     try:
-        # Query DynamoDB for responses within the time window using resource API
+        # Query DynamoDB with the correct sort key format
         response = table.query(
             KeyConditionExpression=Key('uuid').eq(uuid_key) &
-            Key('TIME#DAY').between(start_key, end_key),
+            Key('sort_key').between(start_sort_key, end_sort_key),
+            ScanIndexForward=False,  # Get most recent first
             Limit=20  # Limit to 20 most recent responses
         )
 
-        # Return the items from the response
-        return response.get('Items', [])
+        items = response.get('Items', [])
+        logger.info(
+            f"Retrieved {len(items)} past responses for user {uuid_key}")
+
+        # If no items found, try an alternative approach - query just by UUID
+        if not items:
+            logger.info(
+                f"No responses found with exact sort key format, attempting broader query")
+            # Query just by the partition key
+            response = table.query(
+                KeyConditionExpression=Key('uuid').eq(uuid_key),
+                ScanIndexForward=False,  # Get most recent first
+                Limit=20  # Limit to 20 most recent responses
+            )
+            items = response.get('Items', [])
+            logger.info(
+                f"Retrieved {len(items)} past responses using partition key only")
+
+            # Log the actual sort keys to understand the format
+            if items:
+                sort_keys = [item.get('sort_key')
+                             for item in items if 'sort_key' in item]
+                logger.info(
+                    f"Actual sort keys in the database: {sort_keys[:5]}")
+
+        return items
     except Exception as e:
         logger.error(f"Error querying DynamoDB: {str(e)}")
         raise

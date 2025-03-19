@@ -232,8 +232,9 @@ async def upload_response_dynamo(response, uuid, request_id):
     # Extract data needed for storage
     emotion_tag = response["emotion"]["main"]
     uuid_key = f'uuid#{uuid}'  # Format UUID as partition key
-    # Create sort key for querying by time/day
-    day_time_key = f'TIME#{time}#DAY#{day_of_week}'
+    # Create sort key for querying by time/day - format as HH:MM:SS
+    formatted_time = time.strftime("%H:%M:%S")
+    day_time_key = f'TIME#{formatted_time}#DAY#{day_of_week}'
     light_settings = response["lightSetting"]
     context = response["context"]
 
