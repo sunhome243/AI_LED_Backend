@@ -142,7 +142,13 @@ def get_past_reponse(uuid, timestamp=None):
         f"Querying for responses with sort keys between {start_sort_key} and {end_sort_key}")
 
     # Format UUID with prefix to match how it's stored in the database
-    uuid_key = f'uuid#{uuid}'
+    # Check if UUID already has the prefix before adding it
+    if uuid.startswith('uuid#'):
+        uuid_key = uuid
+    else:
+        uuid_key = f'uuid#{uuid}'
+
+    logger.info(f"Using UUID key for query: {uuid_key}")
 
     # Get the DynamoDB table reference
     table = dynamodb.Table('ResponseTable')
