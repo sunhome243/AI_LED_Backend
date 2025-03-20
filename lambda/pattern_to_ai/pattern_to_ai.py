@@ -9,6 +9,7 @@ from google import genai
 from google.genai import types
 from get_gemini_config_surprise_me import get_gemini_config
 from constants import VALID_DYNAMIC_MODES
+from decimal import Decimal
 
 
 class AuthenticationError(Exception):
@@ -198,6 +199,14 @@ def get_past_reponse(uuid, timestamp=None):
         raise
 
 
+# Custom JSON encoder to handle Decimal objects
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj) if obj % 1 else int(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+
 def get_genai_response(past_response, timestamp=None):
     """
     Generate a response using Gemini AI based on past user responses.
@@ -329,7 +338,8 @@ Current Time: Monday, 14:30
         if not past_response:
             user_prompt = f"Generate a lighting recommendation for a new user. Current time: {current_time_str}"
         else:
-            user_prompt = f"Based on these past responses: {json.dumps(past_response)}, generate a lighting recommendation. Current time: {current_time_str}"
+            # Use the custom JSON encoder when serializing past_response
+            user_prompt = f"Based on these past responses: {json.dumps(past_response, cls=DecimalEncoder)}, generate a lighting recommendation. Current time: {current_time_str}"
 
         # Combine the instruction and user prompt
         combined_prompt = f"{instruction_text}\n\nUser Request: {user_prompt}"
