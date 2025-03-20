@@ -336,6 +336,9 @@ def verify_and_parse_json(response):
         Parsed JSON if valid, None otherwise
     """
     try:
+        # Log the full response from Gemini
+        logger.info(f"Response from Gemini AI: {response.text}")
+
         # Extract JSON from Gemini response
         json_response = json.loads(response.text)
     except Exception as e:
