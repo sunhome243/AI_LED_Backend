@@ -15,7 +15,8 @@ DYNAMIC_MODES = {
     "MUSIC1": 8,
     "MUSIC2": 9,
     "MUSIC3": 10,
-    "MUSIC4": 11
+    "MUSIC4": 11,
+    "AUTO": 20,
 }
 
 # Valid dynamic modes for validation
