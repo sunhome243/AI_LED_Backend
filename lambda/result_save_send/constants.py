@@ -5,6 +5,9 @@ Configuration constants for the AI LED Backend orchestrator
 # Dynamic mode mapping to IR codes
 DYNAMIC_MODES = {
     "FLASH": 0,
+    "STROBE": 1,
+    "FADE": 2,
+    "SMOOTH": 3,
     "JUMP3": 4,
     "JUMP7": 5,
     "FADE3": 6,
@@ -12,12 +15,14 @@ DYNAMIC_MODES = {
     "MUSIC1": 8,
     "MUSIC2": 9,
     "MUSIC3": 10,
-    "MUSIC4": 11
+    "MUSIC4": 11,
+    "AUTO": 20,
 }
 
 # Valid dynamic modes for validation
 VALID_DYNAMIC_MODES = [
-    "FLASH", "JUMP3", "JUMP7", "FADE3", "FADE7",
+    "AUTO", "SLOW", "QUICK", "FLASH",
+    "FADE7", "FADE3", "JUMP7", "JUMP3",
     "MUSIC1", "MUSIC2", "MUSIC3", "MUSIC4"
 ]
 
