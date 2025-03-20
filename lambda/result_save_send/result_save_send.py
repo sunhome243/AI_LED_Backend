@@ -49,11 +49,13 @@ async def configure_light_settings(json_response):
         result["rgbCode"] = light_setting.get("color", [0, 0, 0])
         # Get IR codes for controlling RGB light
         ir_codes = get_ir_code(device_type)
-    elif "dynamicMode" in light_setting:
+    elif "dynamic" in light_setting:
         # Set rgbCode to default for dynamic mode
         result["rgbCode"] = [0, 0, 0]
         # Get dynamic mode from lightSetting
-        dynamic_mode = light_setting.get("dynamicMode")
+        dynamic_mode = light_setting.get("dynamic")
+        # Log the dynamic mode being used
+        logger.info(f"Using dynamic mode: {dynamic_mode}")
         # Get IR codes for dynamic mode
         ir_codes = get_dynamic_mode(dynamic_mode, device_type)
     else:
