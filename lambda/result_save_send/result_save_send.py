@@ -334,6 +334,9 @@ async def send_data_to_arduino(connection_id, response):
         raise ValueError("Connection ID cannot be empty")
 
     try:
+        # Log the response being sent to Arduino
+        logger.info(f"Sending response to Arduino: {response}")
+
         # Fix WebSocket URL format for the API Gateway client
         # Extract the domain part without the stage
         if websocket_url.startswith('wss://'):

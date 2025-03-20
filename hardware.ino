@@ -319,10 +319,18 @@ bool parseAndProcessJson(uint8_t * payload, size_t length) {
   serializeJson(doc, Serial);
   Serial.println();
   
-  // Simplified message processing - don't worry about API Gateway formatting
-  // Just look for the actual command data in the message field or at root level
+  // Filter out system messages like "Unsupported route: $default"
   if (doc.containsKey("message")) {
     JsonVariant message = doc["message"];
+    
+    // Check if message is a system error message
+    if (message.is<const char*>()) {
+      const char* msgStr = message.as<const char*>();
+      if (msgStr && strstr(msgStr, "Unsupported route") != NULL) {
+        Serial.println(F("[System] Ignoring API Gateway system message"));
+        return true; // Return true but don't process the message further
+      }
+    }
     
     // If message is a string (text format JSON)
     if (message.is<const char*>()) {
@@ -365,7 +373,7 @@ bool parseAndProcessJson(uint8_t * payload, size_t length) {
 // Process JSON message
 //------------------------------------------------------------------------------
 void processJsonMessage(const JsonDocument& doc) {
-  // Check for dynamic IR code first - if present, only process this and skip everything else
+  // Check for dynamic IR code first
   if (doc.containsKey("dynamicIr")) {
     const char* dynamicValue = doc["dynamicIr"];
     
@@ -375,6 +383,15 @@ void processJsonMessage(const JsonDocument& doc) {
       
       // Send the dynamic IR code immediately if valid
       if (ir_dynamic != 0) {
+        // If device is OFF, turn it ON first
+        if (!powerOn) {
+          Serial.println("[Dynamic Mode] Device is OFF, turning ON first");
+          sendIRCode(ir_power, true);
+          powerOn = true;
+          markActivity();
+          delay(150); // Wait for device to initialize
+        }
+        
         // Debug output
         Serial.printf("[Dynamic Mode] Received IR code: %s (0x%08X)\n", dynamicValue, ir_dynamic);
         
@@ -525,12 +542,11 @@ void adjustRGB(int targetR, int targetG, int targetB) {
   // Enter DIY mode (attempt twice to account for possible transmission failure)
   sendIRCode(ir_enterDiy, true);
   delay(100); // Increased wait time after first DIY command
-  
   sendIRCode(ir_enterDiy, true);
   delay(150); // Increased wait time for DIY mode activation
 
   // Adjust channels with larger differences first for efficiency
-  struct Channel {
+  struct Channel {  
     int diff;
     uint32_t upCode;
     uint32_t downCode;
@@ -551,12 +567,11 @@ void adjustRGB(int targetR, int targetG, int targetB) {
       }
     }
   }
-  
+
   // Adjust channels with largest differences first
   for (int i = 0; i < 3; i++) {
     int idx = channels[i].index;
     int diff = (idx == 0) ? rDiff : (idx == 1 ? gDiff : bDiff);
-    
     if (diff != 0) {
       uint32_t code = (diff > 0) ? channels[i].upCode : channels[i].downCode;
       int count = abs(diff);
