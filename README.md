@@ -80,7 +80,7 @@ The system uses IR codes to control LED devices. Below is the IR code mapping us
 
 | Mode   | IR Code (HEX) | Description                      |
 | ------ | ------------- | -------------------------------- |
-| AUTO   | FFC837        | Automatic color cycling          |
+| AUTO   | FFE817        | Automatic color cycling          |
 | SLOW   | FFC837        | Slow color transition            |
 | QUICK  | FFF00F        | Quick color transition           |
 | FLASH  | FFD02F        | Strobe effect                    |

@@ -106,7 +106,7 @@ void saveToEEPROM();                   // Save data to EEPROM
 void markActivity();                   // Record activity
 void handleSerialJson();               // Handle serial JSON commands
 void adjustRGB(int targetR, int targetG, int targetB); // Adjust RGB values
-void sendIRCode(uint32_t code, bool withDelay = false); // Send IR code
+bool sendIRCode(uint32_t code, bool withDelay = false); // Send IR code
 void sendUpDownSequence(uint32_t updownCode, int count); // Send sequential IR codes
 void reportCurrentState();             // Report current state
 bool parseAndProcessJson(uint8_t * payload, size_t length); // Parse and process JSON
@@ -379,26 +379,32 @@ void processJsonMessage(const JsonDocument& doc) {
     
     // Only process if dynamicIr has a non-empty value
     if (dynamicValue && strlen(dynamicValue) > 0) {
-      ir_dynamic = strtol(dynamicValue, NULL, 16);
-      
-      // Send the dynamic IR code immediately if valid
-      if (ir_dynamic != 0) {
-        // If device is OFF, turn it ON first
-        if (!powerOn) {
-          Serial.println("[Dynamic Mode] Device is OFF, turning ON first");
-          sendIRCode(ir_power, true);
-          powerOn = true;
-          markActivity();
-          delay(150); // Wait for device to initialize
-        }
-        
-        // Debug output
-        Serial.printf("[Dynamic Mode] Received IR code: %s (0x%08X)\n", dynamicValue, ir_dynamic);
-        
-        // Send the IR code
-        sendIRCode(ir_dynamic, true);
-        Serial.printf("[Dynamic Mode] Sent IR code: 0x%08X\n", ir_dynamic);
+      // Convert hex string to uint32_t properly
+      // Ensure proper format by adding 0x prefix if not present
+      char hexBuffer[16] = {0};
+      if (strncmp(dynamicValue, "0x", 2) != 0 && strncmp(dynamicValue, "0X", 2) != 0) {
+        snprintf(hexBuffer, sizeof(hexBuffer), "0x%s", dynamicValue);
+        ir_dynamic = strtoul(hexBuffer, NULL, 0);
+      } else {
+        ir_dynamic = strtoul(dynamicValue, NULL, 0);
       }
+      
+      // If device is OFF, turn it ON first
+      if (!powerOn) {
+        Serial.println("[Dynamic Mode] Device is OFF, turning ON first");
+        sendIRCode(ir_power, true);
+        powerOn = true;
+        markActivity();
+        delay(150); // Wait for device to initialize
+      }
+      
+      // Debug output with proper hex formatting
+      Serial.printf("[Dynamic Mode] Received IR code: %s (0x%08X)\n", dynamicValue, ir_dynamic);
+      
+      // Send the IR code with more robust approach
+      bool success = sendIRCode(ir_dynamic, true);
+      Serial.printf("[Dynamic Mode] Sent IR code: 0x%08X (Success: %s)\n", 
+                    ir_dynamic, success ? "Yes" : "No");
       
       // Exit early - don't process any other controls when in dynamic mode
       return;
@@ -408,7 +414,7 @@ void processJsonMessage(const JsonDocument& doc) {
   
   // Normal processing for all other cases (when no valid dynamicIr is present)
   
-  // Update IR codes in memory
+  // Update IR codes in memory - handle null values properly
   const char* irCommands[] = {
     "enterDiy", "power", "rup", "rdown", "gup", "gdown", "bup", "bdown",
     "auto", "slow", "quick", "flash", "fade7", "fade3", "jump7", "jump3", 
@@ -420,11 +426,25 @@ void processJsonMessage(const JsonDocument& doc) {
     &ir_music1, &ir_music2, &ir_music3, &ir_music4
   };
   
+  // Process IR code updates from JSON - with improved null handling
   for (int i = 0; i < sizeof(irCommands)/sizeof(irCommands[0]); i++) {
     if (doc.containsKey(irCommands[i])) {
+      // Check for null value
+      if (doc[irCommands[i]].isNull()) {
+        Serial.printf("[IR] Skipping null value for %s\n", irCommands[i]);
+        continue;
+      }
+      
       const char* irValue = doc[irCommands[i]];
       if (irValue && strlen(irValue) > 0) {
-        *irCodes[i] = strtol(irValue, NULL, 16);
+        // Convert hex string to uint32_t properly
+        char hexBuffer[16] = {0};
+        if (strncmp(irValue, "0x", 2) != 0 && strncmp(irValue, "0X", 2) != 0) {
+          snprintf(hexBuffer, sizeof(hexBuffer), "0x%s", irValue);
+          *irCodes[i] = strtoul(hexBuffer, NULL, 0);
+        } else {
+          *irCodes[i] = strtoul(irValue, NULL, 0);
+        }
         Serial.printf("[IR] Updated %s code: %s (0x%08X)\n", irCommands[i], irValue, *irCodes[i]);
       }
     }
@@ -539,11 +559,20 @@ void adjustRGB(int targetR, int targetG, int targetB) {
   Serial.printf("[RGB] Adjusting: [%d,%d,%d] → [%d,%d,%d]\n", 
                rgb[0], rgb[1], rgb[2], targetR, targetG, targetB);
 
+  // Check if IR codes are valid before proceeding
+  if (ir_enterDiy == 0 || ir_rup == 0 || ir_rdown == 0 || 
+      ir_gup == 0 || ir_gdown == 0 || ir_bup == 0 || ir_bdown == 0) {
+    Serial.println("[RGB] Error: One or more required IR codes are invalid (zero)");
+    Serial.printf("[RGB] DIY=%08X, RUP=%08X, RDOWN=%08X, GUP=%08X, GDOWN=%08X, BUP=%08X, BDOWN=%08X\n",
+                 ir_enterDiy, ir_rup, ir_rdown, ir_gup, ir_gdown, ir_bup, ir_bdown);
+    return;
+  }
+
   // Enter DIY mode (attempt twice to account for possible transmission failure)
   sendIRCode(ir_enterDiy, true);
-  delay(100); // Increased wait time after first DIY command
+  delay(150); // Increased wait time after first DIY command
   sendIRCode(ir_enterDiy, true);
-  delay(150); // Increased wait time for DIY mode activation
+  delay(200); // Increased wait time for DIY mode activation
 
   // Adjust channels with larger differences first for efficiency
   struct Channel {  
@@ -591,24 +620,53 @@ void adjustRGB(int targetR, int targetG, int targetB) {
 }
 
 //------------------------------------------------------------------------------
-// Send IR code
+// Send IR code - fixed to handle void return type of sendNEC
 //------------------------------------------------------------------------------
-void sendIRCode(uint32_t code, bool withDelay) {
+bool sendIRCode(uint32_t code, bool withDelay) {
+  if (code == 0) {
+    Serial.println("[IR] Error: Attempted to send IR code 0");
+    return false;
+  }
+  
+  // Debug the IR transmission
+  Serial.printf("[IR] Sending NEC code: 0x%08X\n", code);
+  
+  // Turn on the built-in LED to indicate transmission
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW); // LOW turns on the LED on most ESP boards
+  
+  // Send the IR code - function returns void, not a boolean
   irsend.sendNEC(code, 32);
-  if (withDelay) delay(20); // Increased from 10ms to 20ms
+  
+  // Turn off LED
+  digitalWrite(LED_BUILTIN, HIGH); // HIGH turns off the LED
+  
+  if (withDelay) delay(50); // Increased from 20ms to 50ms for better reliability
+  
+  // Assume success if we get this far
+  return true;
 }
 
 //------------------------------------------------------------------------------
-// Send sequential IR codes
+// Send sequential IR codes - improved reliability
 //------------------------------------------------------------------------------
 void sendUpDownSequence(uint32_t updownCode, int count) {
-  // No restriction: count = min(count, 30); 
+  if (updownCode == 0) {
+    Serial.println("[IR] Error: Attempted to send zero IR code in sequence");
+    return;
+  }
   
-  // IR code interval adjustment (70ms)
+  // IR code interval adjustment (70ms for better reliability)
   const int IR_SIGNAL_GAP = 70;
   
+  Serial.printf("[IR] Sending sequence of %d codes (0x%08X)\n", count, updownCode);
+  
   for (int i = 0; i < count; i++) {
-    sendIRCode(updownCode);
+    bool success = sendIRCode(updownCode, false);
+    
+    if (!success) {
+      Serial.printf("[IR] Failed to send code at step %d\n", i);
+    }
     
     // Reset watchdog and maintain interval
     ESP.wdtFeed();
@@ -616,7 +674,7 @@ void sendUpDownSequence(uint32_t updownCode, int count) {
     
     // Additional wait time for many signals
     if (count > 10 && i % 10 == 9) {
-      delay(50); // Additional rest after every 10 signals
+      delay(70); // Increased from 50ms to 100ms for reliability
     }
   }
 }
