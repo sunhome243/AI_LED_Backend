@@ -1,6 +1,6 @@
 # Project Overview
 
-Prism LED transforms ordinary LED strips into adaptive smart lighting through an Arduino controller. Users simply describe their situation in natural language, and our system automatically selects optimal lighting while learning preferences over time. 
+Prism LED transforms ordinary LED strips into adaptive smart lighting through an Arduino controller. Users simply describe their situation in natural language, and our system automatically selects optimal lighting while learning preferences over time.
 
 This affordable, eco-friendly solution requires no LED replacement, making premium lighting experiences accessible to everyone through a simple plug-and-play setup and flexible subscription options. Designed primarily for budget-conscious students and young adults, Prism represents the future of personalized, intelligent lighting.
 
@@ -318,17 +318,6 @@ To build the complete system, you'll need:
    - IR transmitter for communication
 2. **LED Strip**: RGB or RGBW LED strip compatible with IR controller
 3. **Power Supply**: Appropriate for your LED strip length and specifications
-
-### Hardware Setup Diagram
-
-```mermaid
-flowchart LR
-    A[ESP8266/Arduino] -->|WiFi| B[AWS Backend]
-    A -->|IR Signal| C[IR Receiver]
-    C -->|Control| D[LED Controller]
-    D -->|Power/Data| E[LED Strip]
-    F[Power Supply] -->|5-12V| D
-```
 
 ## Notes on Implementation
 
