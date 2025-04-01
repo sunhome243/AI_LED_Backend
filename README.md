@@ -1,4 +1,10 @@
-# AI LED Backend
+# Project Overview
+
+Prism LED transforms ordinary LED strips into adaptive smart lighting through an Arduino controller. Users simply describe their situation in natural language, and our system automatically selects optimal lighting while learning preferences over time. 
+
+This affordable, eco-friendly solution requires no LED replacement, making premium lighting experiences accessible to everyone through a simple plug-and-play setup and flexible subscription options. Designed primarily for budget-conscious students and young adults, Prism represents the future of personalized, intelligent lighting.
+
+<img src="./public/example.png" alt="Operation Example" width="600px">
 
 This repository contains the Infrastructure as Code (IaC) for an AI-powered LED control system using AWS services and Terraform. The system processes audio and pattern inputs through Google's Gemini AI to generate personalized lighting configurations, which are then sent to IoT devices.
 
@@ -7,6 +13,19 @@ This repository contains the Infrastructure as Code (IaC) for an AI-powered LED 
 - **Backend**: [AI_LED_Backend](https://github.com/sunhokim/AI_LED_Backend) (this repository)
 - **Frontend**: [AI_LED_Frontend](https://github.com/TaemnLee/AI_LED_Frontend)
 - **Project Canvas**: [Lean Canvas](https://sunhome243.github.io/leancanvas/) - Learn more about the project vision, target customers, and business model
+
+## Tech Stack
+
+![Python](https://img.shields.io/badge/-Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![AWS](https://img.shields.io/badge/-AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![Lambda](https://img.shields.io/badge/-Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
+![DynamoDB](https://img.shields.io/badge/-DynamoDB-4053D6?style=for-the-badge&logo=amazon-dynamodb&logoColor=white)
+![S3](https://img.shields.io/badge/-S3-569A31?style=for-the-badge&logo=amazon-s3&logoColor=white)
+![API Gateway](https://img.shields.io/badge/-API%20Gateway-FF4F8B?style=for-the-badge&logo=amazon-api-gateway&logoColor=white)
+![WebSocket](https://img.shields.io/badge/-WebSocket-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![Terraform](https://img.shields.io/badge/-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)
+![Gemini AI](https://img.shields.io/badge/-Gemini%20AI-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![Arduino](https://img.shields.io/badge/-Arduino-00979D?style=for-the-badge&logo=arduino&logoColor=white)
 
 ## System Architecture
 
@@ -18,6 +37,58 @@ The AI LED system provides a novel approach to personalized lighting through AI-
 4. **AWS API Gateway** for REST and WebSocket APIs
 5. **S3** for storage
 6. **IoT Devices** for light control via IR codes
+
+### 1. Home Page
+
+<img src="./public/HomeImage.png" alt="Home Page" width="600px">
+
+### 2. UUID Input Page
+
+<img src="./public/UUIDImage.png" alt="UUID Input Page" width="600px">
+
+### 3. PIN Input Page
+
+<img src="./public/PINImage.png" alt="PIN Input Page" width="600px">
+
+### 4. Recording Page
+
+<img src="./public/RecordingImage.png" alt="Recording Page" width="600px">
+
+### Architecture Diagram
+
+```mermaid
+flowchart TD
+    A[Frontend Application] -->|REST API| B[API Gateway]
+    Z[IoT Device] <-->|WebSocket| B
+    B -->|Audio Processing| C[Lambda: audio_to_ai]
+    B -->|Pattern Processing| D[Lambda: pattern_to_ai]
+    B -->|WebSocket Connection| E[Lambda: connection_manager]
+    C --> F[Google Gemini AI]
+    D --> F
+    F --> G[Lambda: result_save_send]
+    G --> H[(DynamoDB Tables)]
+    G --> I[S3 Bucket]
+    G -->|Send Commands| B
+    H --> J[(AuthTable)]
+    H --> K[(IrCodeTable)]
+    H --> L[(ResponseTable)]
+    H --> M[(ConnectionIdTable)]
+```
+
+### Data Flow Diagram
+
+```mermaid
+flowchart TD
+    A[Frontend: User Input] -->|Audio/Pattern Data| B[API Gateway]
+    B -->|Process Request| C[Lambda Functions]
+    C -->|Analyze Content| D[Google Gemini AI]
+    D -->|Generate Recommendation| E[Lambda: result_save_send]
+    E -->|Store Results| F[(DynamoDB)]
+    E -->|Archive Data| G[S3 Bucket]
+    E -->|Send Commands| H[WebSocket API]
+    H -->|IR Codes| I[IoT Device]
+    I -->|Control| J[LED Strip]
+```
 
 ## Components
 
@@ -55,46 +126,6 @@ The system supports two modes of operation:
    - MUSIC1, MUSIC2, MUSIC3, MUSIC4
 
 The AI selects the appropriate mode based on context, audio content, or user patterns.
-
-## IR Code Reference
-
-The system uses IR codes to control LED devices. Below is the IR code mapping used by the system:
-
-| Function       | IR Code (HEX) | Description                 |
-| -------------- | ------------- | --------------------------- |
-| POWER          | FF02FD        | Turn the light on/off       |
-| BRIGHTNESSDOWN | FFBA45        | Decrease overall brightness |
-| BRIGHTNESSUP   | FF3AC5        | Increase overall brightness |
-| RED            | FF1AE5        | Set color to red            |
-| GREEN          | FF9A65        | Set color to green          |
-| BLUE           | FFA25D        | Set color to blue           |
-| WHITE          | FF22DD        | Set color to white          |
-| RUP            | FF28D7        | Increase red component      |
-| RDOWN          | FF08F7        | Decrease red component      |
-| GUP            | FFA857        | Increase green component    |
-| GDOWN          | FF8877        | Decrease green component    |
-| BUP            | FF6897        | Increase blue component     |
-| BDOWN          | FF48B7        | Decrease blue component     |
-
-### Dynamic Mode IR Codes
-
-| Mode   | IR Code (HEX) | Description                      |
-| ------ | ------------- | -------------------------------- |
-| AUTO   | FFE817        | Automatic color cycling          |
-| SLOW   | FFC837        | Slow color transition            |
-| QUICK  | FFF00F        | Quick color transition           |
-| FLASH  | FFD02F        | Strobe effect                    |
-| FADE7  | FFE01F        | Gradual fade through 7 colors    |
-| FADE3  | FF609F        | Gradual fade through 3 colors    |
-| JUMP7  | FFA05F        | Jump between 7 colors            |
-| JUMP3  | FF20DF        | Jump between 3 colors            |
-| MUSIC1 | FF12ED        | Music reactive mode 1 (gentle)   |
-| MUSIC2 | FF32CD        | Music reactive mode 2 (moderate) |
-| MUSIC3 | FFF807        | Music reactive mode 3 (dynamic)  |
-| MUSIC4 | FFD827        | Music reactive mode 4 (intense)  |
-| DIY1   | FF30CF        | Custom DIY mode                  |
-
-_Note: These IR codes are specific to the LED controller used in this project and may vary for different hardware._
 
 ## API Reference
 
@@ -283,10 +314,21 @@ The Lambda functions are located in the `/lambda` directory:
 To build the complete system, you'll need:
 
 1. **IoT Device**
-1.1 Arduino or ESP8266/ESP32 with WiFi capabilities
-1.2 IR transmitter for communication
+   - Arduino or ESP8266/ESP32 with WiFi capabilities
+   - IR transmitter for communication
 2. **LED Strip**: RGB or RGBW LED strip compatible with IR controller
 3. **Power Supply**: Appropriate for your LED strip length and specifications
+
+### Hardware Setup Diagram
+
+```mermaid
+flowchart LR
+    A[ESP8266/Arduino] -->|WiFi| B[AWS Backend]
+    A -->|IR Signal| C[IR Receiver]
+    C -->|Control| D[LED Controller]
+    D -->|Power/Data| E[LED Strip]
+    F[Power Supply] -->|5-12V| D
+```
 
 ## Notes on Implementation
 
@@ -333,6 +375,46 @@ To destroy the infrastructure when no longer needed:
 ```bash
 terraform destroy
 ```
+
+## IR Code Reference
+
+The system uses IR codes to control LED devices. Below is the IR code mapping used by the system:
+
+| Function       | IR Code (HEX) | Description                 |
+| -------------- | ------------- | --------------------------- |
+| POWER          | FF02FD        | Turn the light on/off       |
+| BRIGHTNESSDOWN | FFBA45        | Decrease overall brightness |
+| BRIGHTNESSUP   | FF3AC5        | Increase overall brightness |
+| RED            | FF1AE5        | Set color to red            |
+| GREEN          | FF9A65        | Set color to green          |
+| BLUE           | FFA25D        | Set color to blue           |
+| WHITE          | FF22DD        | Set color to white          |
+| RUP            | FF28D7        | Increase red component      |
+| RDOWN          | FF08F7        | Decrease red component      |
+| GUP            | FFA857        | Increase green component    |
+| GDOWN          | FF8877        | Decrease green component    |
+| BUP            | FF6897        | Increase blue component     |
+| BDOWN          | FF48B7        | Decrease blue component     |
+
+### Dynamic Mode IR Codes
+
+| Mode   | IR Code (HEX) | Description                      |
+| ------ | ------------- | -------------------------------- |
+| AUTO   | FFE817        | Automatic color cycling          |
+| SLOW   | FFC837        | Slow color transition            |
+| QUICK  | FFF00F        | Quick color transition           |
+| FLASH  | FFD02F        | Strobe effect                    |
+| FADE7  | FFE01F        | Gradual fade through 7 colors    |
+| FADE3  | FF609F        | Gradual fade through 3 colors    |
+| JUMP7  | FFA05F        | Jump between 7 colors            |
+| JUMP3  | FF20DF        | Jump between 3 colors            |
+| MUSIC1 | FF12ED        | Music reactive mode 1 (gentle)   |
+| MUSIC2 | FF32CD        | Music reactive mode 2 (moderate) |
+| MUSIC3 | FFF807        | Music reactive mode 3 (dynamic)  |
+| MUSIC4 | FFD827        | Music reactive mode 4 (intense)  |
+| DIY1   | FF30CF        | Custom DIY mode                  |
+
+_Note: These IR codes are specific to the LED controller used in this project and may vary for different hardware._
 
 ## Contact
 
