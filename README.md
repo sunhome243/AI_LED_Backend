@@ -4,7 +4,7 @@ Prism LED transforms ordinary LED strips into adaptive smart lighting through an
 
 This affordable, eco-friendly solution requires no LED replacement, making premium lighting experiences accessible to everyone through a simple plug-and-play setup and flexible subscription options. Designed primarily for budget-conscious students and young adults, Prism represents the future of personalized, intelligent lighting.
 
-<img src="./public/example.png" alt="Operation Example" width="600px">
+<img src="./public/example.png" alt="Operation Example" width="200px">
 
 This repository contains the Infrastructure as Code (IaC) for an AI-powered LED control system using AWS services and Terraform. The system processes audio and pattern inputs through Google's Gemini AI to generate personalized lighting configurations, which are then sent to IoT devices.
 
