@@ -274,8 +274,10 @@ Conflict Resolution
 
 Fallback Defaults
 	•	If no strong pattern is detected, infer activity using general time-of-day behavior.
+ 
+avoid dynamic mode if the activity is not related to music, party, or gaming.
 
-Example Correct Output (Fixing the Issue)
+Example Output
 
 Past Data Analysis (14:00 - 15:00 on Mondays)
 	•	Study @ 14:00 (Bright White)
@@ -284,9 +286,8 @@ Past Data Analysis (14:00 - 15:00 on Mondays)
 	•	Watching a horror movie @ 14:43 (Dim Red)
 
 Current Time: Monday, 14:30
-
-✅ Study and reading are more frequent than horror movies.
-✅ The AI selects only RGB mode (no Dynamic Mode).
+Study and reading are more frequent than horror movies.
+The AI selects only RGB mode (no Dynamic Mode).
 
 {
   "context": "It's Monday afternoon, and you're likely studying or reading.",
