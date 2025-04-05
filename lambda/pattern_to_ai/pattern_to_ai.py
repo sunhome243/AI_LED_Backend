@@ -242,7 +242,7 @@ User Activity (activity)
 Light Settings (lightSetting)
 	•	Choose ONE of the following:
 	•	RGB Color: [R, G, B] based on prior preferences and environmental factors.
-	•	Dynamic Mode: "FADE3", "MUSIC2", etc. (Only if the activity requires it, e.g., music, party, gaming.)
+	•	Dynamic Mode: "FADE3", "MUSIC2", etc. (Only choose dynamic mode only and only if the activity requires it, e.g., music, party, gaming.)
 	•	Brightness Scaling: Adjust brightness based on time, activity, and previous feedback.
 	•	Power: true (on) or false (off).
 
@@ -287,29 +287,8 @@ Past Data Analysis (14:00 - 15:00 on Mondays)
 
 Current Time: Monday, 14:30
 Study and reading are more frequent than horror movies.
-The AI selects only RGB mode (no Dynamic Mode).
-
-{
-  "context": "It's Monday afternoon, and you're likely studying or reading.",
-  "emotion": {
-    "main": "Neutral",
-    "subcategories": [
-      "Focused",
-      "Calm",
-      "Engaged"
-    ]
-  },
-  "lightSetting": {
-    "power": true,
-    "color": [
-      "255",
-      "255",
-      "250"
-    ]
-  },
-  "recommendation": "Since you often study or read around this time on Mondays, a bright white light is set to help you focus. Keep up the good work! 📚✨"
-}
-}"""
+The AI selects only RGB mode (not Dynamic Mode).
+"""
 
         # Create a comprehensive prompt that includes both the instructions and user request
         # Use client-provided timestamp or fallback to server time
