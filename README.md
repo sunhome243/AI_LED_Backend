@@ -1,5 +1,7 @@
 # Project Overview
 
+🏆 **Award Winner**: Prism LED won 1st place in the Denison University Startup Competition!
+
 Prism LED transforms ordinary LED strips into adaptive smart lighting through an Arduino controller. Users simply describe their situation in natural language, and our system automatically selects optimal lighting while learning preferences over time.
 
 This affordable, eco-friendly solution requires no LED replacement, making premium lighting experiences accessible to everyone through a simple plug-and-play setup and flexible subscription options. Designed primarily for budget-conscious students and young adults, Prism represents the future of personalized, intelligent lighting.
